@@ -8,7 +8,7 @@ OpenDataSoft v2 records API. This is the best case for bulk collection because t
 
 ## `arcgis_feature_service`
 
-ArcGIS FeatureServer layer query endpoint. These can usually be downloaded page-by-page with `where=1=1&outFields=*&f=json`. Many municipal open-data landing pages expose an ArcGIS service URL, but the exact layer URL must be pasted into `endpoint` before enabling the source. Polygon layers are mapped to a representative coordinate using their geometry bounds so they can appear on the portable map.
+Permit-record query endpoints that happen to be published through ArcGIS FeatureServer or MapServer. These can usually be downloaded page-by-page with `where=1=1&outFields=*&f=json`. Only use this kind when the layer itself contains permit or development-application records; do not ingest generic GIS layers. Polygon permit records are mapped to a representative coordinate using their geometry bounds so they can appear on the portable map.
 
 ## `html_table`
 
@@ -24,7 +24,7 @@ Public CSV/TSV report downloads, or report index pages that link to supported CS
 
 ## `report_download_needed`
 
-Public report indexes or PDF/spreadsheet report links where records may be published, but a dedicated parser still has to be added before bulk ingestion is reliable. These sources are audited as `endpoint_needed`; reachable PDF links are discovered and recorded in the audit message without attempting to parse the PDF.
+Public report indexes or PDF/spreadsheet report links where records may be published, but a dedicated parser still has to be added before bulk permit-record collection is reliable. These sources are audited as `endpoint_needed`; reachable PDF links are discovered and recorded in the audit message without attempting to parse the PDF.
 
 ## `public_search_needs_input`
 

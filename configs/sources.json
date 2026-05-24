@@ -892,7 +892,7 @@
         "reports",
         "application records"
       ],
-      "skip_reason": "Source requires endpoint/report discovery before bulk ingestion."
+      "skip_reason": "Source requires endpoint/report discovery before bulk permit-record collection."
     },
     {
       "id": "city_north_vancouver_cityserve",
@@ -975,7 +975,7 @@
         "dashboard",
         "permit statistics"
       ],
-      "skip_reason": "Dashboard/data source must be discovered before bulk ingestion."
+      "skip_reason": "Dashboard/data source must be discovered before bulk permit-record collection."
     },
     {
       "id": "city_langley_development_application_portal",
@@ -1042,7 +1042,7 @@
         "issued_date": "Issued|Issue Date|Date Issued",
         "applied_date": "Applied|Received|Application Date|Date"
       },
-      "skip_reason": "Current official page exposes public annual/monthly report links; add a report downloader/parser before enabling bulk ingestion.",
+      "skip_reason": "Current official page exposes public annual/monthly report links; add a report downloader/parser before enabling bulk permit-record collection.",
       "notes": "Verified current monthly reports page on 2026-05-24."
     },
     {
@@ -1212,7 +1212,7 @@
         "property",
         "address"
       ],
-      "skip_reason": "Interactive GIS map; use GIS endpoint only if public and documented."
+      "skip_reason": "Interactive map; enable only if a public documented permit-record endpoint exists."
     },
     {
       "id": "victoria_open_data_permits",
@@ -1572,7 +1572,7 @@
         "issued_date": "Issued|Issue Date|Date Issued",
         "applied_date": "Applied|Received|Application Date|Date"
       },
-      "skip_reason": "Current official records are published as monthly PDF reports; add a PDF report downloader/parser before enabling bulk ingestion.",
+      "skip_reason": "Current official records are published as monthly PDF reports; add a PDF report downloader/parser before enabling bulk permit-record collection.",
       "notes": "Verified April 2026 building permits issued PDF on 2026-05-24."
     },
     {
@@ -1830,7 +1830,7 @@
         "interactive map",
         "status"
       ],
-      "skip_reason": "Interactive map endpoint must be confirmed before bulk ingestion."
+      "skip_reason": "Interactive map endpoint must be confirmed as a permit-record endpoint before bulk collection."
     },
     {
       "id": "kamloops_mycity",
@@ -1957,7 +1957,7 @@
       "search_keys": [
         "application status"
       ],
-      "skip_reason": "Endpoint must be confirmed before bulk ingestion."
+      "skip_reason": "Endpoint must be confirmed as a permit-record endpoint before bulk collection."
     },
     {
       "id": "prrd_active_development",

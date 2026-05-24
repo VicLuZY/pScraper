@@ -2,9 +2,11 @@
 
 A Go starter package for collecting openly downloadable permit records from British Columbia public permit sources, deduplicating them, and maintaining current status plus status-change history.
 
+The scraper collects permit information. The map is a presentation layer over the scraped permit database; it is not a generic GIS-layer ingestion tool.
+
 This is intentionally conservative:
 
-- It downloads only open datasets, public feature services, static public tables, and other sources that publish records without login or secret search input.
+- It downloads only open permit datasets, permit-record APIs, static public permit tables, and other sources that publish permit records without login or secret search input.
 - It records skips for applicant-only, login-only, access-code, or search-input-only portals.
 - It does not bypass CAPTCHA, logins, robots controls, access-code gates, or session restrictions.
 - It retains raw source fields so field maps can be tuned as portals change.
@@ -33,7 +35,7 @@ For a safe smoke run over every configured source row, including intentional ski
 go run ./cmd/permit-scraper --sources configs/sources.json --db data/permits-db --try-all --limit 10 --max-pages 1 --parallel 4
 ```
 
-Start the interactive GIS viewer after a scrape has produced `data/permits-db/current.jsonl`:
+Start the interactive permit map after a scrape has produced `data/permits-db/current.jsonl`:
 
 ```bash
 go run ./cmd/permit-map --db data/permits-db --web web --addr 127.0.0.1:8080
@@ -55,7 +57,7 @@ Build a portable Windows package:
 powershell -ExecutionPolicy Bypass -File scripts/package-windows.ps1
 ```
 
-The package is written to `dist/portable` and zipped as `dist/portable.zip`. It includes one executable, `pScraper.exe`, plus `configs/sources.json`, launch `.cmd` files, and the current `data/permits-db` when present. `pScraper.exe` contains the scraper, live GIS map server, static map exporter, and JSONL-to-SQLite importer. The map UI is embedded, so the live map does not need a separate `web` folder.
+The package is written to `dist/portable` and zipped as `dist/portable.zip`. It includes one executable, `pScraper.exe`, plus `configs/sources.json`, launch `.cmd` files, and the current `data/permits-db` when present. `pScraper.exe` contains the permit scraper, live permit map server, static map exporter, and JSONL-to-SQLite importer. The map UI is embedded, so the live map does not need a separate `web` folder.
 
 Portable direct commands:
 
@@ -86,7 +88,7 @@ Important fields:
 | `download_all` | Whether a bulk download is appropriate for this source. |
 | `openly_searchable` | Whether the source exposes public records without applicant credentials. |
 | `needs_input` | Whether a permit number/address/date/account is required. |
-| `endpoint` | API endpoint. For ArcGIS this must be the actual `.../FeatureServer/<layer>/query` URL. |
+| `endpoint` | Permit-record API endpoint. If a municipality publishes permit records through ArcGIS, this must be the actual permit layer `.../FeatureServer/<layer>/query` URL. |
 | `field_map` | Maps canonical fields to source field names. Use `|` for fallbacks, e.g. `PermitNumber|permit_number|Permit No`. |
 
 ## Current included source rows
@@ -96,7 +98,7 @@ The configuration currently contains 76 source rows. Normal `--all` runs include
 Enabled machine-readable sources include:
 
 - OpenDataSoft: Vancouver issued building permits.
-- ArcGIS FeatureServer layers: Kelowna, Maple Ridge, New Westminster, Port Moody, Columbia Shuswap Regional District, Coquitlam, Victoria permits and development applications, and BC Energy Regulator well surface hole permits.
+- Permit-record APIs exposed through ArcGIS/FeatureServer: Kelowna, Maple Ridge, New Westminster, Port Moody, Columbia Shuswap Regional District, Coquitlam, Victoria permits and development applications, and BC Energy Regulator well surface hole permits.
 - Public indexes and static HTML/table candidates that are safe to audit: Nanaimo What's Building, Township of Langley, North Saanich, Saanich, Richmond, City of Langley, Chilliwack, Regional District of Nanaimo, Regional District of Central Kootenay, and Regional District of Okanagan-Similkameen.
 
 The remaining configured rows are deliberately classified as `endpoint_needed`, `requires_search_input`, `login_or_authorized_only`, or `not_public_bulk` when they are not ready or appropriate for open bulk collection. CSV/TSV report downloads can use `report_download`; PDF-only report sources remain auditable as `report_download_needed` until a reliable parser is configured.
@@ -120,15 +122,15 @@ The default database remains a file-backed JSONL store because it is simple to i
 ## Recommended production workflow
 
 1. Run `--try-all --limit 10 --max-pages 1` to build a skip/error audit.
-2. For each ArcGIS landing page, discover the exact FeatureServer layer URL and paste the `.../query` endpoint into `configs/sources.json`.
-3. Add dedicated source scrapers only where an official public API exists.
+2. For each source landing page, confirm that the endpoint publishes permit records, then paste the exact API URL into `configs/sources.json`.
+3. Add dedicated source scrapers only where an official public permit-record API or index exists.
 4. Keep applicant-login portals out of bulk runs unless an authorised export/API exists.
 5. Schedule low-frequency runs and keep the `scrape_audit.jsonl` file.
 6. Review source terms, robots files, and privacy constraints before production use.
 
-## Example ArcGIS endpoint
+## Example Permit API Endpoint
 
-A valid ArcGIS endpoint usually looks like:
+Some municipalities publish permit records through ArcGIS FeatureServer APIs. Use those only when the layer itself is a permit-record dataset:
 
 ```text
 https://services.arcgis.com/<org>/arcgis/rest/services/<layer>/FeatureServer/0/query
