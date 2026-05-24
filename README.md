@@ -13,7 +13,7 @@ This is intentionally conservative:
 
 ```bash
 go test ./...
-go run ./cmd/permit-scraper --sources configs/sources.json --db data/permits-db --all --limit 25 --max-pages 1
+go run ./cmd/permit-scraper --sources configs/sources.json --db data/permits-db --all --limit 25 --max-pages 1 --parallel 4
 ```
 
 The first run creates:
@@ -22,12 +22,15 @@ The first run creates:
 data/permits-db/current.jsonl       # latest deduped current state
 data/permits-db/history.jsonl       # insert/update history
 data/permits-db/scrape_audit.jsonl  # per-source audit log
+data/permits-db/scrape_progress.json # latest per-source progress snapshot
 ```
+
+`--parallel` controls source-level concurrency. The default is `1`; use a small value such as `4` for faster runs while still keeping database writes serialized.
 
 For a safe smoke run over every configured source row, including intentional skips:
 
 ```bash
-go run ./cmd/permit-scraper --sources configs/sources.json --db data/permits-db --try-all --limit 10 --max-pages 1
+go run ./cmd/permit-scraper --sources configs/sources.json --db data/permits-db --try-all --limit 10 --max-pages 1 --parallel 4
 ```
 
 Start the interactive GIS viewer after a scrape has produced `data/permits-db/current.jsonl`:
@@ -57,7 +60,7 @@ The package is written to `dist/portable` and zipped as `dist/portable.zip`. It 
 Portable direct commands:
 
 ```cmd
-pScraper.exe scrape --sources configs\sources.json --db data\permits-db --all --limit 25 --max-pages 1
+pScraper.exe scrape --sources configs\sources.json --db data\permits-db --all --limit 25 --max-pages 1 --parallel 4
 pScraper.exe map --db data\permits-db --addr 127.0.0.1:8080
 pScraper.exe export-map --db data\permits-db --out map-export
 pScraper.exe db import-jsonl --jsonl data\permits-db --sqlite data\permits.sqlite --reset
@@ -67,7 +70,7 @@ Use SQLite for relational storage after the JSONL path is working:
 
 ```bash
 go run ./cmd/permit-scraper db import-jsonl --jsonl data/permits-db --sqlite data/permits.sqlite --reset
-go run ./cmd/permit-scraper --sources configs/sources.json --store sqlite --db data/permits.sqlite --all --limit 25 --max-pages 1
+go run ./cmd/permit-scraper --sources configs/sources.json --store sqlite --db data/permits.sqlite --all --limit 25 --max-pages 1 --parallel 4
 ```
 
 ## Source configuration

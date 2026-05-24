@@ -96,12 +96,16 @@ func (c *Client) Head(ctx context.Context, rawURL string, headers map[string]str
 }
 
 func (c *Client) waitHost(host string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	last := c.lastByHost[host]
-	wait := c.MinDelay - time.Since(last)
-	if wait > 0 {
+	for {
+		c.mu.Lock()
+		last := c.lastByHost[host]
+		wait := c.MinDelay - time.Since(last)
+		if wait <= 0 {
+			c.lastByHost[host] = time.Now()
+			c.mu.Unlock()
+			return
+		}
+		c.mu.Unlock()
 		time.Sleep(wait)
 	}
-	c.lastByHost[host] = time.Now()
 }

@@ -41,6 +41,7 @@ func (a portableMapServer) routes() http.Handler {
 	mux.HandleFunc("/api/records", a.handleRecords)
 	mux.HandleFunc("/api/summary", a.handleSummary)
 	mux.HandleFunc("/api/audit", a.handleAudit)
+	mux.HandleFunc("/api/progress", a.handleProgress)
 	mux.Handle("/", http.FileServer(a.webFS()))
 	return mux
 }
@@ -102,6 +103,19 @@ func (a portableMapServer) handleAudit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, rows)
+}
+
+func (a portableMapServer) handleProgress(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	progress, err := mapdata.LoadProgress(filepath.Join(a.dbDir, "scrape_progress.json"))
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+	writeJSON(w, progress)
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

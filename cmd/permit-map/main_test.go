@@ -103,6 +103,44 @@ func TestAPIAuditLimit(t *testing.T) {
 	}
 }
 
+func TestAPIProgress(t *testing.T) {
+	dbDir := t.TempDir()
+	progress := model.ScrapeRunProgress{
+		RunID:     "run-1",
+		Total:     1,
+		Completed: 1,
+		Sources: []model.SourceProgress{{
+			SourceID: "test",
+			Status:   "ok",
+			Progress: 100,
+		}},
+	}
+	b, err := json.Marshal(progress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dbDir, "scrape_progress.json"), b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	app := appServer{dbDir: dbDir, webDir: t.TempDir()}
+	srv := httptest.NewServer(app.routes())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/api/progress")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var got model.ScrapeRunProgress
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Completed != 1 || len(got.Sources) != 1 || got.Sources[0].Progress != 100 {
+		t.Fatalf("bad progress response: %+v", got)
+	}
+}
+
 func TestMapServesEmbeddedWebWhenWebDirMissing(t *testing.T) {
 	app := appServer{dbDir: t.TempDir(), webDir: filepath.Join(t.TempDir(), "missing-web")}
 	srv := httptest.NewServer(app.routes())

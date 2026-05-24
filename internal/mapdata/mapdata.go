@@ -82,6 +82,24 @@ func LoadAudit(path string, limit int) ([]model.ScrapeAudit, error) {
 	return rows, nil
 }
 
+func LoadProgress(path string) (model.ScrapeRunProgress, error) {
+	var progress model.ScrapeRunProgress
+	b, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return progress, nil
+	}
+	if err != nil {
+		return progress, err
+	}
+	if len(strings.TrimSpace(string(b))) == 0 {
+		return progress, nil
+	}
+	if err := json.Unmarshal(b, &progress); err != nil {
+		return progress, fmt.Errorf("parse %s: %w", path, err)
+	}
+	return progress, nil
+}
+
 func Summarize(dbDir string, records []model.PermitRecord) Summary {
 	sum := Summary{
 		DBPath:   dbDir,

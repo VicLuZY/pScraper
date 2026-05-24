@@ -248,6 +248,113 @@ h2 {
   height: 17px;
 }
 
+.progress-section {
+  margin: 12px 14px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+
+.progress-heading {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.progress-heading span {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.progress-list {
+  max-height: 230px;
+  overflow: auto;
+  background: #fff;
+}
+
+.progress-row {
+  display: grid;
+  gap: 6px;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.progress-row:last-child {
+  border-bottom: 0;
+}
+
+.progress-row-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.progress-source {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.progress-percent {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.progress-track {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e3e9ec;
+}
+
+.progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-2);
+}
+
+.progress-row.ok .progress-track span {
+  background: var(--ok);
+}
+
+.progress-row.running .progress-track span {
+  background: var(--accent-2);
+}
+
+.progress-row.skipped .progress-track span {
+  background: var(--warn);
+}
+
+.progress-row.error .progress-track span {
+  background: var(--danger);
+}
+
+.progress-row.pending .progress-track span {
+  background: #9eabb2;
+}
+
+.progress-meta {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
 .filter-foot {
   margin-top: auto;
   border-top: 1px solid var(--line);

@@ -8,7 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/example/bc-permit-scraper/internal/model"
 	"github.com/example/bc-permit-scraper/internal/scrapers"
@@ -179,6 +181,68 @@ func TestRunSkipsDuplicateDedupeKeysWithinSourceBatch(t *testing.T) {
 	history := readJSONLLines(t, filepath.Join(dbDir, "history.jsonl"))
 	if len(history) != 1 {
 		t.Fatalf("expected one history event, got %d", len(history))
+	}
+}
+
+func TestRunScrapesSourcesInParallelAndWritesProgress(t *testing.T) {
+	var active int32
+	var maxActive int32
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		now := atomic.AddInt32(&active, 1)
+		for {
+			seen := atomic.LoadInt32(&maxActive)
+			if now <= seen || atomic.CompareAndSwapInt32(&maxActive, seen, now) {
+				break
+			}
+		}
+		time.Sleep(150 * time.Millisecond)
+		atomic.AddInt32(&active, -1)
+		w.Header().Set("Content-Type", "application/json")
+		id := strings.TrimPrefix(r.URL.Path, "/")
+		_, _ = w.Write([]byte(`{"features":[{"attributes":{"PermitNumber":"BP-` + id + `","Address":"1 Main St"}}]}`))
+	})
+	srvA := httptest.NewServer(handler)
+	defer srvA.Close()
+	srvB := httptest.NewServer(handler)
+	defer srvB.Close()
+
+	cfgPath := writeTestConfig(t, `{
+		"version":"test",
+		"sources":[
+			{"id":"arc_a","name":"Arc A","jurisdiction":"City of Test","kind":"arcgis_feature_service","endpoint":"`+srvA.URL+`/a","enabled":true,"field_map":{"permit_number":"PermitNumber","address":"Address"}},
+			{"id":"arc_b","name":"Arc B","jurisdiction":"City of Test","kind":"arcgis_feature_service","endpoint":"`+srvB.URL+`/b","enabled":true,"field_map":{"permit_number":"PermitNumber","address":"Address"}}
+		]
+	}`)
+	dbDir := filepath.Join(t.TempDir(), "db")
+	var out bytes.Buffer
+	if err := run([]string{"--sources", cfgPath, "--db", dbDir, "--all", "--parallel", "2"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if atomic.LoadInt32(&maxActive) < 2 {
+		t.Fatalf("expected concurrent source requests, max active was %d", maxActive)
+	}
+	var sum summary
+	if err := json.Unmarshal(out.Bytes(), &sum); err != nil {
+		t.Fatal(err)
+	}
+	if sum.Sources != 2 || sum.RecordsSeen != 2 || sum.Inserted != 2 {
+		t.Fatalf("bad parallel summary: %+v", sum)
+	}
+	var progress model.ScrapeRunProgress
+	b, err := os.ReadFile(filepath.Join(dbDir, "scrape_progress.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(b, &progress); err != nil {
+		t.Fatal(err)
+	}
+	if progress.Total != 2 || progress.Completed != 2 {
+		t.Fatalf("bad progress totals: %+v", progress)
+	}
+	for _, row := range progress.Sources {
+		if row.Status != "ok" || row.Progress != 100 {
+			t.Fatalf("expected completed progress row, got %+v", row)
+		}
 	}
 }
 

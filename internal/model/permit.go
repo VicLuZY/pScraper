@@ -97,6 +97,32 @@ type ScrapeAudit struct {
 	Skipped      bool   `json:"skipped"`
 }
 
+type ScrapeRunProgress struct {
+	RunID      string           `json:"run_id"`
+	StartedAt  string           `json:"started_at"`
+	FinishedAt string           `json:"finished_at,omitempty"`
+	Total      int              `json:"total"`
+	Completed  int              `json:"completed"`
+	Sources    []SourceProgress `json:"sources"`
+}
+
+type SourceProgress struct {
+	SourceID     string `json:"source_id"`
+	SourceName   string `json:"source_name"`
+	Jurisdiction string `json:"jurisdiction"`
+	Kind         string `json:"kind"`
+	StartedAt    string `json:"started_at,omitempty"`
+	FinishedAt   string `json:"finished_at,omitempty"`
+	Status       string `json:"status"`
+	Message      string `json:"message,omitempty"`
+	Progress     int    `json:"progress"`
+	RecordsSeen  int    `json:"records_seen"`
+	Inserted     int    `json:"inserted"`
+	Updated      int    `json:"updated"`
+	Unchanged    int    `json:"unchanged"`
+	Skipped      bool   `json:"skipped"`
+}
+
 func NowUTC() string {
 	return time.Now().UTC().Format(time.RFC3339)
 }

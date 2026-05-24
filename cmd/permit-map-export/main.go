@@ -16,10 +16,11 @@ import (
 )
 
 type exportData struct {
-	GeneratedAt string               `json:"generated_at"`
-	Records     []model.PermitRecord `json:"records"`
-	Summary     mapdata.Summary      `json:"summary"`
-	Audit       []model.ScrapeAudit  `json:"audit"`
+	GeneratedAt string                  `json:"generated_at"`
+	Records     []model.PermitRecord    `json:"records"`
+	Summary     mapdata.Summary         `json:"summary"`
+	Audit       []model.ScrapeAudit     `json:"audit"`
+	Progress    model.ScrapeRunProgress `json:"progress"`
 }
 
 type exportSummary struct {
@@ -58,12 +59,17 @@ func run(args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
+	progress, err := mapdata.LoadProgress(filepath.Join(dbDir, "scrape_progress.json"))
+	if err != nil {
+		return err
+	}
 	generatedAt := model.NowUTC()
 	payload := exportData{
 		GeneratedAt: generatedAt,
 		Records:     records,
 		Summary:     mapdata.Summarize(dbDir, records),
 		Audit:       audit,
+		Progress:    progress,
 	}
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return err

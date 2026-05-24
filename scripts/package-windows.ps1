@@ -32,7 +32,7 @@ Copy-Item -LiteralPath "README.md" -Destination (Join-Path $OutDir "README.md")
 @echo off
 setlocal
 cd /d "%~dp0"
-pScraper.exe scrape --sources configs\sources.json --db data\permits-db --all --limit 25 --max-pages 1
+pScraper.exe scrape --sources configs\sources.json --db data\permits-db --all --limit 25 --max-pages 1 --parallel 4
 pause
 '@ | Set-Content -Path (Join-Path $OutDir "run-scraper.cmd") -Encoding ASCII
 
@@ -73,7 +73,7 @@ Run `export-static-map.cmd`, then open `map-export\index.html` directly or publi
 ## Direct commands
 
 ```cmd
-pScraper.exe scrape --sources configs\sources.json --db data\permits-db --all --limit 25 --max-pages 1
+pScraper.exe scrape --sources configs\sources.json --db data\permits-db --all --limit 25 --max-pages 1 --parallel 4
 pScraper.exe map --db data\permits-db --addr 127.0.0.1:8080
 pScraper.exe export-map --db data\permits-db --out map-export
 pScraper.exe db import-jsonl --jsonl data\permits-db --sqlite data\permits.sqlite --reset

@@ -4,6 +4,7 @@ const state = {
   markers: new Map(),
   selectedKey: "",
   firstFit: true,
+  progress: null,
 };
 
 const els = {};
@@ -46,6 +47,8 @@ function cacheElements() {
     "mappedOnly",
     "unmappedCount",
     "statusGroupCount",
+    "progressSummary",
+    "sourceProgressList",
     "recordsList",
     "resultCount",
     "detailPanel",
@@ -99,13 +102,15 @@ function bindControls() {
 async function loadData() {
   try {
     setStatus("Loading records");
-    const { records, summary, audit, mode } = await loadDataset();
+    const { records, summary, audit, progress, mode } = await loadDataset();
 
     state.records = records.map(enrichRecord);
     state.filtered = state.records.slice();
+    state.progress = progress;
     populateFilters(state.records);
     renderSummary(summary, audit);
     renderAudit(audit);
+    renderSourceProgress(progress, audit);
     applyFilters();
     setStatus(`Loaded ${state.records.length.toLocaleString()} current records${mode === "static" ? " from static export" : ""}`);
   } catch (err) {
@@ -120,15 +125,17 @@ async function loadDataset() {
       records: window.PERMIT_STATIC_DATA.records || [],
       summary: window.PERMIT_STATIC_DATA.summary || {},
       audit: window.PERMIT_STATIC_DATA.audit || [],
+      progress: window.PERMIT_STATIC_DATA.progress || null,
       mode: "static",
     };
   }
-  const [records, summary, audit] = await Promise.all([
+  const [records, summary, audit, progress] = await Promise.all([
     fetchJSON("/api/records"),
     fetchJSON("/api/summary"),
     fetchJSON("/api/audit?limit=1000"),
+    fetchJSON("/api/progress").catch(() => null),
   ]);
-  return { records, summary, audit, mode: "api" };
+  return { records, summary, audit, progress, mode: "api" };
 }
 
 async function fetchJSON(url) {
@@ -296,6 +303,98 @@ function renderAudit(audit) {
     });
 }
 
+function renderSourceProgress(progress, audit) {
+  const rows = progressRows(progress, audit);
+  els.sourceProgressList.replaceChildren();
+  if (rows.length === 0) {
+    els.progressSummary.textContent = "No run";
+    els.sourceProgressList.append(emptyState("No progress data"));
+    return;
+  }
+
+  const completed = rows.filter((row) => Number(row.progress || 0) >= 100 || isFinishedStatus(row.status)).length;
+  const total = Number(progress?.total || rows.length);
+  els.progressSummary.textContent = `${number(completed)} / ${number(total)}`;
+
+  rows
+    .slice()
+    .sort(compareProgressRows)
+    .forEach((row) => {
+      const item = document.createElement("div");
+      item.className = `progress-row ${progressClass(row.status)}`;
+
+      const top = document.createElement("div");
+      top.className = "progress-row-top";
+      const name = document.createElement("span");
+      name.className = "progress-source";
+      name.textContent = first(row.source_name, row.source_id, "Unknown source");
+      const pct = document.createElement("span");
+      pct.className = "progress-percent";
+      pct.textContent = `${progressPercent(row)}%`;
+      top.append(name, pct);
+
+      const track = document.createElement("div");
+      track.className = "progress-track";
+      const fill = document.createElement("span");
+      fill.style.width = `${progressPercent(row)}%`;
+      track.append(fill);
+
+      const meta = document.createElement("div");
+      meta.className = "progress-meta";
+      meta.textContent = [
+        labelCase(first(row.status, "pending")),
+        row.records_seen ? `${number(row.records_seen)} records` : "",
+        row.message && row.status !== "ok" ? row.message.replace(/^skip\s+[^:]+:\s*/i, "") : "",
+      ]
+        .filter(Boolean)
+        .join(" | ");
+
+      item.append(top, track, meta);
+      els.sourceProgressList.append(item);
+    });
+}
+
+function progressRows(progress, audit) {
+  if (progress && Array.isArray(progress.sources) && progress.sources.length > 0) {
+    return progress.sources;
+  }
+  const latest = latestAuditRun(audit);
+  if (!latest) return [];
+  return latest.rows.map((row) => ({
+    ...row,
+    progress: 100,
+  }));
+}
+
+function compareProgressRows(a, b) {
+  const rank = (row) => {
+    if (row.status === "running") return 0;
+    if (row.status === "pending") return 1;
+    if (row.status === "broken_or_changed") return 2;
+    if (row.skipped) return 3;
+    return 4;
+  };
+  return rank(a) - rank(b) || first(a.source_name, a.source_id).localeCompare(first(b.source_name, b.source_id));
+}
+
+function progressPercent(row) {
+  const value = Number(row.progress);
+  if (Number.isFinite(value)) return Math.max(0, Math.min(100, Math.round(value)));
+  return isFinishedStatus(row.status) ? 100 : row.status === "running" ? 35 : 0;
+}
+
+function isFinishedStatus(status) {
+  return ["ok", "endpoint_needed", "requires_search_input", "login_or_authorized_only", "not_public_bulk", "broken_or_changed", "canceled"].includes(status || "");
+}
+
+function progressClass(status) {
+  if (status === "ok") return "ok";
+  if (status === "running") return "running";
+  if (status === "broken_or_changed") return "error";
+  if (status === "pending") return "pending";
+  return "skipped";
+}
+
 function latestAuditRun(audit) {
   if (!Array.isArray(audit) || audit.length === 0) return null;
   const runID = audit[audit.length - 1].run_id;
@@ -305,7 +404,7 @@ function latestAuditRun(audit) {
     const status = row.status || "unknown";
     statuses[status] = (statuses[status] || 0) + 1;
   });
-  return { run_id: runID, count: rows.length, statuses };
+  return { run_id: runID, count: rows.length, statuses, rows };
 }
 
 function renderMarkers() {
