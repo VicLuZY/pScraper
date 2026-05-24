@@ -1,0 +1,21 @@
+{
+  "total_count": 2,
+  "results": [
+    {
+      "permit_number": "BP-2026-001",
+      "permit_type": "Building Permit",
+      "status": "Issued",
+      "address": "123 Main Street",
+      "issued_date": "2026-01-02",
+      "description": "Interior alteration"
+    },
+    {
+      "permit_number": "BP-2026-002",
+      "permit_type": "Demolition Permit",
+      "status": "Submitted",
+      "address": "456 Oak Avenue",
+      "applied_date": "2026-01-03",
+      "description": "Demolish accessory building"
+    }
+  ]
+}

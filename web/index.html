@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BC Permit GIS</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <div class="brand-mark">BC</div>
+          <div>
+            <h1>BC Permit GIS</h1>
+            <div class="subtitle" id="dataSubtitle">Loading permit database</div>
+          </div>
+        </div>
+        <div class="toolbar">
+          <button id="fitMapBtn" class="icon-button" type="button" title="Fit visible mapped records">
+            <i data-lucide="scan"></i>
+            <span>Fit</span>
+          </button>
+          <button id="resetBtn" class="icon-button" type="button" title="Reset filters">
+            <i data-lucide="rotate-ccw"></i>
+            <span>Reset</span>
+          </button>
+          <button id="exportBtn" class="icon-button" type="button" title="Export filtered CSV">
+            <i data-lucide="download"></i>
+            <span>CSV</span>
+          </button>
+        </div>
+      </header>
+
+      <section class="banner" aria-label="Database status">
+        <div class="metric">
+          <span class="metric-label">Records</span>
+          <strong id="metricRecords">0</strong>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Mapped</span>
+          <strong id="metricMapped">0</strong>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Sources</span>
+          <strong id="metricSources">0</strong>
+        </div>
+        <div class="metric wide">
+          <span class="metric-label">Latest Run</span>
+          <strong id="metricRun">No audit loaded</strong>
+        </div>
+      </section>
+
+      <main class="workspace">
+        <aside class="filter-panel" aria-label="Filters">
+          <div class="panel-heading">
+            <h2>Filters</h2>
+            <span id="filterCount">0 visible</span>
+          </div>
+
+          <label class="field">
+            <span>Search</span>
+            <input id="searchInput" type="search" placeholder="Permit, address, description">
+          </label>
+
+          <label class="field">
+            <span>Jurisdiction</span>
+            <select id="jurisdictionFilter"></select>
+          </label>
+
+          <label class="field">
+            <span>Source</span>
+            <select id="sourceFilter"></select>
+          </label>
+
+          <label class="field">
+            <span>Status</span>
+            <select id="statusFilter"></select>
+          </label>
+
+          <label class="field">
+            <span>Permit Type</span>
+            <select id="typeFilter"></select>
+          </label>
+
+          <div class="date-grid">
+            <label class="field">
+              <span>From</span>
+              <input id="fromDate" type="date">
+            </label>
+            <label class="field">
+              <span>To</span>
+              <input id="toDate" type="date">
+            </label>
+          </div>
+
+          <label class="toggle-row">
+            <input id="mappedOnly" type="checkbox">
+            <span>Mapped records only</span>
+          </label>
+
+          <div class="filter-foot">
+            <div class="mini-stat">
+              <span>Unmapped in view</span>
+              <strong id="unmappedCount">0</strong>
+            </div>
+            <div class="mini-stat">
+              <span>Status groups</span>
+              <strong id="statusGroupCount">0</strong>
+            </div>
+          </div>
+        </aside>
+
+        <section class="map-panel" aria-label="Permit map">
+          <div id="map"></div>
+          <div class="map-legend" id="mapLegend"></div>
+        </section>
+
+        <aside class="records-panel" aria-label="Permit records">
+          <div class="panel-heading">
+            <h2>Records</h2>
+            <span id="resultCount">0</span>
+          </div>
+          <div class="records-list" id="recordsList"></div>
+          <div class="detail-panel" id="detailPanel">
+            <div class="empty-state">Select a record</div>
+          </div>
+        </aside>
+      </main>
+
+      <footer class="statusbar">
+        <div id="statusText">Preparing map</div>
+        <div id="auditStrip" class="audit-strip"></div>
+      </footer>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

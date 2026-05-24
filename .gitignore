@@ -1,0 +1,17 @@
+# Local scrape output and runtime logs.
+data/
+*.log
+*.err.log
+
+# Generated build output. Keep the packaged deliverable zip tracked.
+dist/portable/
+dist/permit-map/
+
+# Go/test artifacts.
+*.exe
+*.test
+coverage.out
+
+# OS/editor noise.
+.DS_Store
+Thumbs.db
