@@ -2,14 +2,17 @@ package mapdata
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/example/bc-permit-scraper/internal/bundle"
 	"github.com/example/bc-permit-scraper/internal/model"
 )
 
@@ -24,7 +27,7 @@ type Summary struct {
 }
 
 func LoadRecords(path string) ([]model.PermitRecord, error) {
-	f, err := os.Open(path)
+	f, err := openOrBundle(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf("%s does not exist; run permit-scraper first", path)
 	}
@@ -54,7 +57,7 @@ func LoadRecords(path string) ([]model.PermitRecord, error) {
 }
 
 func LoadAudit(path string, limit int) ([]model.ScrapeAudit, error) {
-	f, err := os.Open(path)
+	f, err := openOrBundle(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return []model.ScrapeAudit{}, nil
 	}
@@ -84,7 +87,7 @@ func LoadAudit(path string, limit int) ([]model.ScrapeAudit, error) {
 
 func LoadProgress(path string) (model.ScrapeRunProgress, error) {
 	var progress model.ScrapeRunProgress
-	b, err := os.ReadFile(path)
+	b, err := readFileOrBundle(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return progress, nil
 	}
@@ -98,6 +101,42 @@ func LoadProgress(path string) (model.ScrapeRunProgress, error) {
 		return progress, fmt.Errorf("parse %s: %w", path, err)
 	}
 	return progress, nil
+}
+
+func openOrBundle(path string) (io.ReadCloser, error) {
+	f, err := os.Open(path)
+	if err == nil {
+		return f, nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	b, ok, bundleErr := bundle.ReadDefault(path)
+	if bundleErr != nil {
+		return nil, bundleErr
+	}
+	if !ok {
+		return nil, err
+	}
+	return io.NopCloser(bytes.NewReader(b)), nil
+}
+
+func readFileOrBundle(path string) ([]byte, error) {
+	b, err := os.ReadFile(path)
+	if err == nil {
+		return b, nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	b, ok, bundleErr := bundle.ReadDefault(path)
+	if bundleErr != nil {
+		return nil, bundleErr
+	}
+	if !ok {
+		return nil, err
+	}
+	return b, nil
 }
 
 func Summarize(dbDir string, records []model.PermitRecord) Summary {

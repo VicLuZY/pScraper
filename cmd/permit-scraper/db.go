@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/example/bc-permit-scraper/internal/bundle"
 	"github.com/example/bc-permit-scraper/internal/model"
 	sqlitestore "github.com/example/bc-permit-scraper/internal/storage/sqlite"
 )
@@ -98,13 +100,15 @@ func runImportJSONL(args []string, stdout io.Writer) error {
 
 func readOptionalPortableJSONL[T any](path string, fn func(T) error) error {
 	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
-		return nil
+		if !bundle.IsDefault(path) {
+			return nil
+		}
 	}
 	return readPortableJSONL(path, fn)
 }
 
 func readPortableJSONL[T any](path string, fn func(T) error) error {
-	f, err := os.Open(path)
+	f, err := openPortableJSONL(path)
 	if err != nil {
 		return err
 	}
@@ -131,4 +135,22 @@ func readPortableJSONL[T any](path string, fn func(T) error) error {
 		return err
 	}
 	return nil
+}
+
+func openPortableJSONL(path string) (io.ReadCloser, error) {
+	f, err := os.Open(path)
+	if err == nil {
+		return f, nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	b, ok, bundleErr := bundle.ReadDefault(path)
+	if bundleErr != nil {
+		return nil, bundleErr
+	}
+	if !ok {
+		return nil, err
+	}
+	return io.NopCloser(bytes.NewReader(b)), nil
 }

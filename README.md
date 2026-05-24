@@ -57,16 +57,18 @@ Build a portable Windows package:
 powershell -ExecutionPolicy Bypass -File scripts/package-windows.ps1
 ```
 
-The package is written to `dist/portable` and zipped as `dist/portable.zip`. It includes one executable, `pScraper.exe`, plus `configs/sources.json`, launch `.cmd` files, and the current `data/permits-db` when present. `pScraper.exe` contains the permit scraper, live permit map server, static map exporter, and JSONL-to-SQLite importer. The map UI is embedded, so the live map does not need a separate `web` folder.
+The package is written as a single file: `dist/pScraper.exe`. No config folder, data folder, launcher scripts, or zip file are required. `pScraper.exe` embeds the default source config, the current permit database snapshot, and the map UI. When a scrape is run, it writes fresh runtime output to `data/permits-db` unless another `--db` path is supplied.
 
 Portable direct commands:
 
 ```cmd
-pScraper.exe scrape --sources configs\sources.json --db data\permits-db --all --limit 25 --max-pages 1 --parallel 4
-pScraper.exe map --db data\permits-db --addr 127.0.0.1:8080
-pScraper.exe export-map --db data\permits-db --out map-export
-pScraper.exe db import-jsonl --jsonl data\permits-db --sqlite data\permits.sqlite --reset
+pScraper.exe scrape --all --limit 25 --max-pages 1 --parallel 4
+pScraper.exe map --addr 127.0.0.1:8080
+pScraper.exe export-map --out map-export
+pScraper.exe db import-jsonl --sqlite data\permits.sqlite --reset
 ```
+
+If `configs/sources.json` or `data/permits-db` exist beside the executable, those external files take precedence over the embedded defaults.
 
 Use SQLite for relational storage after the JSONL path is working:
 

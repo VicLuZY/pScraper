@@ -2,9 +2,11 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 
+	"github.com/example/bc-permit-scraper/internal/bundle"
 	"github.com/example/bc-permit-scraper/internal/model"
 )
 
@@ -16,7 +18,18 @@ type File struct {
 func Load(path string) (File, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return File{}, err
+		readErr := err
+		if !errors.Is(err, os.ErrNotExist) {
+			return File{}, err
+		}
+		var ok bool
+		b, ok, err = bundle.ReadDefault(path)
+		if err != nil {
+			return File{}, err
+		}
+		if !ok {
+			return File{}, readErr
+		}
 	}
 	var f File
 	if err := json.Unmarshal(b, &f); err != nil {

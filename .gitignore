@@ -1,14 +1,16 @@
 # Local scrape output and runtime logs.
-data/
+/data/
 *.log
 *.err.log
 
-# Generated build output. Keep the packaged deliverable zip tracked.
-dist/portable/
-dist/permit-map/
+# Generated build output. The distributable is the single tracked exe.
+dist/*
+!dist/
+!dist/pScraper.exe
 
 # Go/test artifacts.
 *.exe
+!dist/pScraper.exe
 *.test
 coverage.out
 

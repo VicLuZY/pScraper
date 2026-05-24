@@ -71,6 +71,23 @@ func TestRunDispatchesPortableDBImport(t *testing.T) {
 	}
 }
 
+func TestRunDispatchesPortableDBImportFromEmbeddedDefaults(t *testing.T) {
+	t.Chdir(t.TempDir())
+	sqlitePath := filepath.Join(t.TempDir(), "permits.sqlite")
+
+	var out bytes.Buffer
+	if err := run([]string{"db", "import-jsonl", "--sqlite", sqlitePath}, &out); err != nil {
+		t.Fatal(err)
+	}
+	var sum portableImportSummary
+	if err := json.Unmarshal(out.Bytes(), &sum); err != nil {
+		t.Fatal(err)
+	}
+	if sum.Current == 0 || sum.History == 0 || sum.Audit == 0 {
+		t.Fatalf("expected embedded JSONL import, got %+v", sum)
+	}
+}
+
 func writePortableTestJSONL[T any](t *testing.T, path string, rows []T) {
 	t.Helper()
 	f, err := os.Create(path)
