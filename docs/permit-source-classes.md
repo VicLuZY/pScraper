@@ -8,11 +8,15 @@ OpenDataSoft v2 records API. This is the best case for bulk collection because t
 
 ## `arcgis_feature_service`
 
-ArcGIS FeatureServer layer query endpoint. These can usually be downloaded page-by-page with `where=1=1&outFields=*&f=json`. Many municipal open-data landing pages expose an ArcGIS service URL, but the exact layer URL must be pasted into `endpoint` before enabling the source.
+ArcGIS FeatureServer layer query endpoint. These can usually be downloaded page-by-page with `where=1=1&outFields=*&f=json`. Many municipal open-data landing pages expose an ArcGIS service URL, but the exact layer URL must be pasted into `endpoint` before enabling the source. Polygon layers are mapped to a representative coordinate using their geometry bounds so they can appear on the portable map.
 
 ## `html_table`
 
 Static HTML tables. The included parser is intentionally simple and safe. It does not execute JavaScript. If a tracker renders data client-side, discover the public API endpoint and add a dedicated scraper rather than trying to bypass the page.
+
+## `nanaimo_whatsbuilding`
+
+City of Nanaimo's public "What's Building" all-active-applications listing. This is treated as a published public index, not as a generic keyword search against a lookup form.
 
 ## `report_download`
 

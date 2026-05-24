@@ -26,6 +26,8 @@ func ForKind(kind string) (Scraper, error) {
 		return ArcGISFeatureService{}, nil
 	case "html_table":
 		return HTMLTable{}, nil
+	case "nanaimo_whatsbuilding":
+		return NanaimoWhatsBuilding{}, nil
 	case "report_download", "report_download_needed":
 		return ReportDownload{}, nil
 	case "unsupported", "applicant_login", "public_search_needs_input", "application_hub", "authority_reference":

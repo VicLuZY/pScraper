@@ -47,6 +47,22 @@ func TestArcGISScraperUsesGeometryWithoutExplicitFieldMap(t *testing.T) {
 	}
 }
 
+func TestArcGISScraperUsesPolygonBoundsForCoordinates(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"features":[{"attributes":{"ProjectNumber":"26-099"},"geometry":{"rings":[[[-123,49],[-121,49],[-121,51],[-123,51],[-123,49]]]}}]}`))
+	}))
+	defer srv.Close()
+	s := model.Source{ID: "arc", Name: "Arc", Jurisdiction: "City of Test", Kind: "arcgis_feature_service", Endpoint: srv.URL, FieldMap: map[string]string{"application_id": "ProjectNumber"}}
+	recs, err := (ArcGISFeatureService{}).Scrape(context.Background(), fetcher.New("test", time.Second, time.Millisecond), s, Options{Limit: 10, MaxPages: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recs) != 1 || recs[0].Latitude != "50" || recs[0].Longitude != "-122" {
+		t.Fatalf("expected polygon center coordinates, got %+v", recs)
+	}
+}
+
 func TestArcGISScraperPaginates(t *testing.T) {
 	offsets := []string{}
 	outSRs := []string{}

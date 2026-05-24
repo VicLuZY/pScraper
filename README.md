@@ -69,7 +69,7 @@ Important fields:
 
 | Field | Meaning |
 |---|---|
-| `kind` | Scraper type: `opendatasoft_v2`, `arcgis_feature_service`, `html_table`, `report_download`, `report_download_needed`, `public_search_needs_input`, `applicant_login`, `application_hub`, or `authority_reference`. |
+| `kind` | Scraper type: `opendatasoft_v2`, `arcgis_feature_service`, `html_table`, `nanaimo_whatsbuilding`, `report_download`, `report_download_needed`, `public_search_needs_input`, `applicant_login`, `application_hub`, or `authority_reference`. |
 | `enabled` | Included by default runs. |
 | `download_all` | Whether a bulk download is appropriate for this source. |
 | `openly_searchable` | Whether the source exposes public records without applicant credentials. |
@@ -79,13 +79,13 @@ Important fields:
 
 ## Current included source rows
 
-The configuration currently contains 76 source rows. Normal `--all` runs include the 21 enabled open/public rows; `--try-all` audits all rows and records why each skipped source was not bulk-scraped.
+The configuration currently contains 76 source rows. Normal `--all` runs include the 23 enabled open/public rows; `--try-all` audits all rows and records why each skipped source was not bulk-scraped.
 
 Enabled machine-readable sources include:
 
 - OpenDataSoft: Vancouver issued building permits.
-- ArcGIS FeatureServer layers: Kelowna, Maple Ridge, New Westminster, Port Moody, Columbia Shuswap Regional District, Victoria permits and development applications, and BC Energy Regulator well surface hole permits.
-- Static HTML/table candidates that are safe to audit: Township of Langley, North Saanich, Saanich, Richmond, City of Langley, Chilliwack, Regional District of Nanaimo, Regional District of Central Kootenay, and Regional District of Okanagan-Similkameen.
+- ArcGIS FeatureServer layers: Kelowna, Maple Ridge, New Westminster, Port Moody, Columbia Shuswap Regional District, Coquitlam, Victoria permits and development applications, and BC Energy Regulator well surface hole permits.
+- Public indexes and static HTML/table candidates that are safe to audit: Nanaimo What's Building, Township of Langley, North Saanich, Saanich, Richmond, City of Langley, Chilliwack, Regional District of Nanaimo, Regional District of Central Kootenay, and Regional District of Okanagan-Similkameen.
 
 The remaining configured rows are deliberately classified as `endpoint_needed`, `requires_search_input`, `login_or_authorized_only`, or `not_public_bulk` when they are not ready or appropriate for open bulk collection. CSV/TSV report downloads can use `report_download`; PDF-only report sources remain auditable as `report_download_needed` until a reliable parser is configured.
 

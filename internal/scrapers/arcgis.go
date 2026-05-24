@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -77,6 +78,10 @@ func (ArcGISFeatureService) Scrape(ctx context.Context, client *fetcher.Client, 
 				for k, v := range geo {
 					raw[k] = v
 				}
+				if lat, lon, ok := arcGeometryCenter(f.Geometry); ok {
+					raw["latitude"] = lat
+					raw["longitude"] = lon
+				}
 				if raw["latitude"] == "" && raw["geometry.y"] != "" {
 					raw["latitude"] = raw["geometry.y"]
 				}
@@ -94,4 +99,70 @@ func (ArcGISFeatureService) Scrape(ctx context.Context, client *fetcher.Client, 
 		}
 	}
 	return out, nil
+}
+
+func arcGeometryCenter(geo map[string]any) (string, string, bool) {
+	x, xOK := numberValue(geo["x"])
+	y, yOK := numberValue(geo["y"])
+	if xOK && yOK {
+		return formatFloat(y), formatFloat(x), true
+	}
+
+	b := geometryBounds{minX: math.Inf(1), minY: math.Inf(1), maxX: math.Inf(-1), maxY: math.Inf(-1)}
+	for _, key := range []string{"rings", "paths", "points"} {
+		collectGeometryBounds(geo[key], &b)
+	}
+	if !b.ok {
+		return "", "", false
+	}
+	return formatFloat((b.minY + b.maxY) / 2), formatFloat((b.minX + b.maxX) / 2), true
+}
+
+type geometryBounds struct {
+	minX float64
+	minY float64
+	maxX float64
+	maxY float64
+	ok   bool
+}
+
+func collectGeometryBounds(v any, b *geometryBounds) {
+	switch x := v.(type) {
+	case []any:
+		if len(x) >= 2 {
+			lon, lonOK := numberValue(x[0])
+			lat, latOK := numberValue(x[1])
+			if lonOK && latOK {
+				b.add(lon, lat)
+				return
+			}
+		}
+		for _, item := range x {
+			collectGeometryBounds(item, b)
+		}
+	}
+}
+
+func (b *geometryBounds) add(x, y float64) {
+	if x < b.minX {
+		b.minX = x
+	}
+	if x > b.maxX {
+		b.maxX = x
+	}
+	if y < b.minY {
+		b.minY = y
+	}
+	if y > b.maxY {
+		b.maxY = y
+	}
+	b.ok = true
+}
+
+func numberValue(v any) (float64, bool) {
+	n, ok := v.(float64)
+	if !ok || math.IsNaN(n) || math.IsInf(n, 0) {
+		return 0, false
+	}
+	return n, true
 }

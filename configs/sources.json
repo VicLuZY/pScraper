@@ -837,12 +837,13 @@
       "jurisdiction": "City of Coquitlam",
       "jurisdiction_type": "Municipality",
       "region": "Metro Vancouver",
-      "kind": "public_search_needs_input",
+      "kind": "arcgis_feature_service",
       "url": "https://coquitlam.ca/1162/Development-Information-Portal",
-      "enabled": false,
-      "download_all": false,
+      "endpoint": "https://services2.arcgis.com/Q6Lq3evZUGfPrN7o/arcgis/rest/services/Development_Information_Demo/FeatureServer/0/query",
+      "enabled": true,
+      "download_all": true,
       "openly_searchable": true,
-      "needs_input": true,
+      "needs_input": false,
       "permit_families": [
         "Development and planning"
       ],
@@ -851,11 +852,21 @@
         "Development application"
       ],
       "search_keys": [
-        "address",
-        "project number",
+        "public authoritative ArcGIS layer",
+        "development projects",
         "status"
       ],
-      "skip_reason": "Public tracker/search exists, but endpoint/API must be discovered before bulk download."
+      "field_map": {
+        "application_id": "PROJECT_NUMBER",
+        "status": "PROJECT_STATUS",
+        "address": "ADDRESS",
+        "applicant": "APPLICANT",
+        "description": "PROJECT_DESCRIPTION",
+        "applied_date": "SUBMISSION_DATE",
+        "latitude": "latitude|geometry.y",
+        "longitude": "longitude|geometry.x"
+      },
+      "skip_reason": "Verified public authoritative ArcGIS Development Information layer query endpoint on 2026-05-24."
     },
     {
       "id": "port_coquitlam_building_development",
@@ -1455,12 +1466,12 @@
       "jurisdiction": "City of Nanaimo",
       "jurisdiction_type": "Municipality",
       "region": "Vancouver Island",
-      "kind": "public_search_needs_input",
-      "url": "https://www.nanaimo.ca/property-development/whats-building",
-      "enabled": false,
-      "download_all": false,
+      "kind": "nanaimo_whatsbuilding",
+      "url": "https://www.nanaimo.ca/whatsbuilding/AllActiveApplications",
+      "enabled": true,
+      "download_all": true,
       "openly_searchable": true,
-      "needs_input": true,
+      "needs_input": false,
       "permit_families": [
         "Building and construction",
         "Development and planning"
@@ -1470,12 +1481,10 @@
         "Development application"
       ],
       "search_keys": [
-        "street",
-        "address",
-        "file number",
-        "status"
+        "all active applications",
+        "public index"
       ],
-      "skip_reason": "Public tracker/map; discover public data endpoint before bulk download."
+      "skip_reason": "Verified public all-active-applications listing on 2026-05-24; no generic keyword search required."
     },
     {
       "id": "rdn_cityview",
