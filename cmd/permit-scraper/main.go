@@ -42,6 +42,44 @@ func main() {
 }
 
 func run(args []string, stdout io.Writer) error {
+	if len(args) > 0 {
+		switch args[0] {
+		case "scrape":
+			return runScrape(args[1:], stdout)
+		case "map", "serve-map":
+			return runMap(args[1:], stdout)
+		case "export-map", "export-static-map":
+			return runMapExport(args[1:], stdout)
+		case "db":
+			return runDB(args[1:], stdout)
+		case "import-jsonl":
+			return runImportJSONL(args[1:], stdout)
+		case "help", "-h", "--help":
+			return printUsage(stdout)
+		default:
+			if !strings.HasPrefix(args[0], "-") {
+				return fmt.Errorf("unknown command %q", args[0])
+			}
+		}
+	}
+	return runScrape(args, stdout)
+}
+
+func printUsage(stdout io.Writer) error {
+	_, err := fmt.Fprint(stdout, `pScraper all-in-one permit scraper
+
+Usage:
+  pScraper.exe scrape [scraper flags]
+  pScraper.exe map [map flags]
+  pScraper.exe export-map [export flags]
+  pScraper.exe db import-jsonl [db flags]
+
+For backward compatibility, scraper flags can be passed without the "scrape" subcommand.
+`)
+	return err
+}
+
+func runScrape(args []string, stdout io.Writer) error {
 	var cfgPath, dbPath, storeKind, sourceIDs, userAgent string
 	var all, tryAll, failFast, dryRun bool
 	var limit, maxPages int

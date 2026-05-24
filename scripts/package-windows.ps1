@@ -23,10 +23,7 @@ $env:GOOS = "windows"
 $env:GOARCH = "amd64"
 $env:CGO_ENABLED = "0"
 
-& $Go build -trimpath -ldflags="-s -w" -o (Join-Path $OutDir "permit-scraper.exe") .\cmd\permit-scraper
-& $Go build -trimpath -ldflags="-s -w" -o (Join-Path $OutDir "permit-map.exe") .\cmd\permit-map
-& $Go build -trimpath -ldflags="-s -w" -o (Join-Path $OutDir "permit-map-export.exe") .\cmd\permit-map-export
-& $Go build -trimpath -ldflags="-s -w" -o (Join-Path $OutDir "permit-db.exe") .\cmd\permit-db
+& $Go build -trimpath -ldflags="-s -w" -o (Join-Path $OutDir "pScraper.exe") .\cmd\permit-scraper
 
 Copy-Item -LiteralPath "configs\sources.json" -Destination (Join-Path $OutDir "configs\sources.json")
 Copy-Item -LiteralPath "README.md" -Destination (Join-Path $OutDir "README.md")
@@ -35,7 +32,7 @@ Copy-Item -LiteralPath "README.md" -Destination (Join-Path $OutDir "README.md")
 @echo off
 setlocal
 cd /d "%~dp0"
-permit-scraper.exe --sources configs\sources.json --db data\permits-db --all --limit 25 --max-pages 1
+pScraper.exe scrape --sources configs\sources.json --db data\permits-db --all --limit 25 --max-pages 1
 pause
 '@ | Set-Content -Path (Join-Path $OutDir "run-scraper.cmd") -Encoding ASCII
 
@@ -43,7 +40,7 @@ pause
 @echo off
 setlocal
 cd /d "%~dp0"
-permit-map.exe --db data\permits-db --addr 127.0.0.1:8080
+pScraper.exe map --db data\permits-db --addr 127.0.0.1:8080
 pause
 '@ | Set-Content -Path (Join-Path $OutDir "run-map.cmd") -Encoding ASCII
 
@@ -51,7 +48,7 @@ pause
 @echo off
 setlocal
 cd /d "%~dp0"
-permit-map-export.exe --db data\permits-db --out map-export
+pScraper.exe export-map --db data\permits-db --out map-export
 echo.
 echo Static map exported to map-export\index.html
 pause
@@ -60,14 +57,14 @@ pause
 @'
 # BC Permit Scraper Portable Package
 
-This folder contains Windows executables. Go is not required on the target machine.
+This folder contains one Windows executable. Go is not required on the target machine.
 
 ## First run
 
 1. Run `run-scraper.cmd` to collect current records into `data\permits-db`.
 2. Run `run-map.cmd` and open `http://127.0.0.1:8080/`.
 
-The map UI is embedded in `permit-map.exe`; there is no separate web folder to copy.
+The scraper, map server, static map export, and JSONL-to-SQLite import are all included in `pScraper.exe`. The map UI is embedded; there is no separate web folder to copy.
 
 ## No localhost map
 
@@ -76,10 +73,10 @@ Run `export-static-map.cmd`, then open `map-export\index.html` directly or publi
 ## Direct commands
 
 ```cmd
-permit-scraper.exe --sources configs\sources.json --db data\permits-db --all --limit 25 --max-pages 1
-permit-map.exe --db data\permits-db --addr 127.0.0.1:8080
-permit-map-export.exe --db data\permits-db --out map-export
-permit-db.exe import-jsonl --jsonl data\permits-db --sqlite data\permits.sqlite --reset
+pScraper.exe scrape --sources configs\sources.json --db data\permits-db --all --limit 25 --max-pages 1
+pScraper.exe map --db data\permits-db --addr 127.0.0.1:8080
+pScraper.exe export-map --db data\permits-db --out map-export
+pScraper.exe db import-jsonl --jsonl data\permits-db --sqlite data\permits.sqlite --reset
 ```
 
 Login-only, access-code, CAPTCHA, and applicant-only sources remain audited skips unless an authorised export/API is added.

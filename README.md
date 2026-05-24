@@ -52,12 +52,21 @@ Build a portable Windows package:
 powershell -ExecutionPolicy Bypass -File scripts/package-windows.ps1
 ```
 
-The package is written to `dist/portable` and zipped as `dist/portable.zip`. It includes `permit-scraper.exe`, `permit-map.exe`, `permit-map-export.exe`, `permit-db.exe`, `configs/sources.json`, launch `.cmd` files, and the current `data/permits-db` when present. The map UI is embedded in `permit-map.exe`, so the live map does not need a separate `web` folder.
+The package is written to `dist/portable` and zipped as `dist/portable.zip`. It includes one executable, `pScraper.exe`, plus `configs/sources.json`, launch `.cmd` files, and the current `data/permits-db` when present. `pScraper.exe` contains the scraper, live GIS map server, static map exporter, and JSONL-to-SQLite importer. The map UI is embedded, so the live map does not need a separate `web` folder.
+
+Portable direct commands:
+
+```cmd
+pScraper.exe scrape --sources configs\sources.json --db data\permits-db --all --limit 25 --max-pages 1
+pScraper.exe map --db data\permits-db --addr 127.0.0.1:8080
+pScraper.exe export-map --db data\permits-db --out map-export
+pScraper.exe db import-jsonl --jsonl data\permits-db --sqlite data\permits.sqlite --reset
+```
 
 Use SQLite for relational storage after the JSONL path is working:
 
 ```bash
-go run ./cmd/permit-db import-jsonl --jsonl data/permits-db --sqlite data/permits.sqlite --reset
+go run ./cmd/permit-scraper db import-jsonl --jsonl data/permits-db --sqlite data/permits.sqlite --reset
 go run ./cmd/permit-scraper --sources configs/sources.json --store sqlite --db data/permits.sqlite --all --limit 25 --max-pages 1
 ```
 
