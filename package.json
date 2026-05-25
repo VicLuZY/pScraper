@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Desktop GUI for BC permit scraping and permit map review.",
-  "author": "VicLuZY",
+  "author": "VicLuZY <VicLuZY@users.noreply.github.com>",
   "main": "electron/main.js",
   "scripts": {
     "go:build": "node electron/scripts/build-backend.mjs",
