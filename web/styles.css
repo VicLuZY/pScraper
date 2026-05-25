@@ -126,6 +126,22 @@ h2 {
   background: #f4f7f7;
 }
 
+.icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.icon-button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.icon-button.primary:hover {
+  border-color: #0b695c;
+  background: #0b695c;
+}
+
 .icon-button svg {
   width: 17px;
   height: 17px;
@@ -228,6 +244,80 @@ h2 {
 .field select:focus {
   outline: 2px solid rgba(15, 123, 108, 0.18);
   border-color: var(--accent);
+}
+
+.desktop-panel[hidden] {
+  display: none;
+}
+
+.desktop-panel {
+  margin: 12px 14px 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+
+.desktop-heading {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.desktop-heading span {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.desktop-grid {
+  display: grid;
+  grid-template-columns: 1fr 78px;
+  gap: 8px;
+  padding: 10px;
+  background: #fff;
+}
+
+.field.compact {
+  padding: 0;
+}
+
+.field.compact input,
+.field.compact select {
+  height: 32px;
+  min-width: 0;
+}
+
+.desktop-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px 10px;
+  background: #fff;
+}
+
+.desktop-actions .icon-button {
+  height: 32px;
+  padding: 0 9px;
+}
+
+.scrape-log {
+  display: block;
+  max-height: 126px;
+  margin: 0;
+  padding: 9px 10px;
+  overflow: auto;
+  border-top: 1px solid var(--line);
+  background: #172026;
+  color: #d9efea;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
 }
 
 .date-grid {

@@ -5,6 +5,7 @@ const state = {
   selectedKey: "",
   firstFit: true,
   progress: null,
+  scrapeLog: [],
 };
 
 const els = {};
@@ -26,6 +27,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initIcons();
   initMap();
   bindControls();
+  initDesktopBridge();
   loadData();
 });
 
@@ -58,6 +60,16 @@ function cacheElements() {
     "fitMapBtn",
     "resetBtn",
     "exportBtn",
+    "desktopPanel",
+    "desktopState",
+    "scrapeMode",
+    "scrapeLimit",
+    "scrapeMaxPages",
+    "scrapeParallel",
+    "runScrapeBtn",
+    "stopScrapeBtn",
+    "openRuntimeBtn",
+    "scrapeLog",
   ].forEach((id) => {
     els[id] = document.getElementById(id);
   });
@@ -97,6 +109,92 @@ function bindControls() {
   els.fitMapBtn.addEventListener("click", fitVisibleRecords);
   els.resetBtn.addEventListener("click", resetFilters);
   els.exportBtn.addEventListener("click", exportFilteredCSV);
+}
+
+function initDesktopBridge() {
+  const desktop = window.pScraperDesktop;
+  if (!desktop || !els.desktopPanel) return;
+
+  els.desktopPanel.hidden = false;
+  els.runScrapeBtn.addEventListener("click", runDesktopScrape);
+  els.stopScrapeBtn.addEventListener("click", stopDesktopScrape);
+  els.openRuntimeBtn.addEventListener("click", () => desktop.openRuntimeDirectory());
+
+  desktop.onScrapeLog(appendScrapeLog);
+  desktop.onScrapeFinished((result) => {
+    updateScrapeControls(false);
+    appendScrapeLog({
+      stream: "system",
+      text: result.signal ? `Stopped at ${result.finishedAt}` : `Finished with code ${result.code} at ${result.finishedAt}`,
+    });
+    setStatus(result.code === 0 ? "Scrape finished; refreshing records" : "Scrape stopped or failed; refreshing records");
+    loadData();
+  });
+  desktop.onBackendExit((result) => {
+    setDesktopState(`Backend exited: ${result.reason}`);
+  });
+
+  desktop.scrapeStatus().then((status) => {
+    updateScrapeControls(status.running);
+  });
+}
+
+async function runDesktopScrape() {
+  const desktop = window.pScraperDesktop;
+  if (!desktop) return;
+  state.scrapeLog = [];
+  appendScrapeLog({ stream: "system", text: "Preparing scrape" });
+  updateScrapeControls(true);
+  const result = await desktop.runScrape(readScrapeOptions());
+  if (!result.ok) {
+    updateScrapeControls(false);
+    appendScrapeLog({ stream: "system", text: result.message || "Scrape did not start" });
+    return;
+  }
+  setStatus("Scrape running");
+}
+
+async function stopDesktopScrape() {
+  const desktop = window.pScraperDesktop;
+  if (!desktop) return;
+  await desktop.stopScrape();
+  setDesktopState("Stopping");
+}
+
+function readScrapeOptions() {
+  return {
+    mode: els.scrapeMode.value,
+    limit: els.scrapeLimit.value,
+    maxPages: els.scrapeMaxPages.value,
+    parallel: els.scrapeParallel.value,
+  };
+}
+
+function updateScrapeControls(running) {
+  els.runScrapeBtn.disabled = running;
+  els.stopScrapeBtn.disabled = !running;
+  setDesktopState(running ? "Running" : "Idle");
+}
+
+function setDesktopState(text) {
+  if (els.desktopState) {
+    els.desktopState.textContent = text;
+  }
+}
+
+function appendScrapeLog(payload) {
+  if (!els.scrapeLog) return;
+  const prefix = payload.stream === "stderr" ? "ERR" : payload.stream === "stdout" ? "OUT" : "SYS";
+  const lines = String(payload.text || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => `${prefix} ${line}`);
+  if (lines.length === 0) return;
+  state.scrapeLog.push(...lines);
+  state.scrapeLog = state.scrapeLog.slice(-80);
+  els.scrapeLog.textContent = state.scrapeLog.join("\n");
+  els.scrapeLog.scrollTop = els.scrapeLog.scrollHeight;
 }
 
 async function loadData() {

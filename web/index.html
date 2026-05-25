@@ -59,6 +59,49 @@
             <span id="filterCount">0 visible</span>
           </div>
 
+          <section class="desktop-panel" id="desktopPanel" aria-label="Desktop scraper controls" hidden>
+            <div class="desktop-heading">
+              <h2>Scraper</h2>
+              <span id="desktopState">Idle</span>
+            </div>
+            <div class="desktop-grid">
+              <label class="field compact">
+                <span>Mode</span>
+                <select id="scrapeMode">
+                  <option value="all">Enabled sources</option>
+                  <option value="try-all">Audit all sources</option>
+                </select>
+              </label>
+              <label class="field compact">
+                <span>Limit</span>
+                <input id="scrapeLimit" type="number" min="1" value="25">
+              </label>
+              <label class="field compact">
+                <span>Pages</span>
+                <input id="scrapeMaxPages" type="number" min="1" value="1">
+              </label>
+              <label class="field compact">
+                <span>Parallel</span>
+                <input id="scrapeParallel" type="number" min="1" value="4">
+              </label>
+            </div>
+            <div class="desktop-actions">
+              <button id="runScrapeBtn" class="icon-button primary" type="button" title="Run scrape">
+                <i data-lucide="play"></i>
+                <span>Run</span>
+              </button>
+              <button id="stopScrapeBtn" class="icon-button" type="button" title="Stop scrape" disabled>
+                <i data-lucide="square"></i>
+                <span>Stop</span>
+              </button>
+              <button id="openRuntimeBtn" class="icon-button" type="button" title="Open data folder">
+                <i data-lucide="folder-open"></i>
+                <span>Data</span>
+              </button>
+            </div>
+            <pre id="scrapeLog" class="scrape-log" aria-label="Scrape log"></pre>
+          </section>
+
           <label class="field">
             <span>Search</span>
             <input id="searchInput" type="search" placeholder="Permit, address, description">

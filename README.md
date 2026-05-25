@@ -43,6 +43,21 @@ go run ./cmd/permit-map --db data/permits-db --web web --addr 127.0.0.1:8080
 
 Open `http://127.0.0.1:8080/`. The viewer serves the current JSONL database through local API endpoints, renders valid latitude/longitude records on a Leaflet map, and keeps unmapped records available in the results sidebar.
 
+Run the desktop GUI with Electron:
+
+```bash
+npm install
+npm start
+```
+
+The Electron app builds the Go backend, starts the permit map server on a private localhost port, and opens the map UI in a desktop window. In desktop mode, the Filters panel includes scraper controls for enabled-source runs, all-source audits, stop, logs, run status, and the runtime data folder.
+
+Build a packaged desktop directory:
+
+```bash
+npm run dist:dir
+```
+
 Export the same viewer as static files when you do not want a local server:
 
 ```bash

@@ -3,6 +3,10 @@
 *.log
 *.err.log
 
+# Node/Electron dependencies and packages.
+node_modules/
+release/
+
 # Generated build output. The distributable is the single tracked exe.
 dist/*
 !dist/
