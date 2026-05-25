@@ -58,6 +58,14 @@ Build a packaged desktop directory:
 npm run dist:dir
 ```
 
+Verify the built desktop app under a Linux display session or Xvfb:
+
+```bash
+npm run test:electron-built
+```
+
+The built-app test launches `release/linux-unpacked/pscraper`, clicks the desktop scraper controls, verifies the 23 enabled sources finish as `ok`, then verifies `try-all` audits every configured source without `broken_or_changed` failures.
+
 Export the same viewer as static files when you do not want a local server:
 
 ```bash

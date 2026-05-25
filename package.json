@@ -11,6 +11,7 @@
     "electron:smoke": "npm run go:build && PSCRAPER_ELECTRON_SMOKE=1 electron --no-sandbox .",
     "dist": "npm run go:build && electron-builder",
     "dist:dir": "npm run go:build && electron-builder --dir",
+    "test:electron-built": "node electron/scripts/test-built-app.mjs",
     "test": "go test ./..."
   },
   "build": {
@@ -55,6 +56,7 @@
   },
   "devDependencies": {
     "electron": "^42.2.0",
-    "electron-builder": "^26.0.12"
+    "electron-builder": "^26.0.12",
+    "playwright": "^1.60.0"
   }
 }
