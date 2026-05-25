@@ -1,8 +1,8 @@
 {
-  "name": "permit-viewer",
+  "name": "pscraper-viewer",
   "version": "1.0.0",
   "private": true,
-  "description": "Static GitHub Pages permit database viewer.",
+  "description": "Static GitHub Pages SQLite database viewer.",
   "scripts": {
     "test": "node scripts/verify-viewer.mjs"
   }

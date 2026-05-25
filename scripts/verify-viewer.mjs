@@ -25,6 +25,11 @@ const forbidden = [
   "native",
   "db",
   "examples",
+  "data",
+  "dist",
+  "release",
+  "electron",
+  "node_modules",
   "go.mod",
   "go.sum",
   "dist/pScraper.exe",
@@ -44,9 +49,17 @@ for (const asset of ["styles.css", "app.js"]) {
 }
 
 const app = fs.readFileSync(path.join(root, "web/app.js"), "utf8");
-for (const expected of ["permit_current", "vancouver_posse_index", "arrayBuffer", "initSqlJs"]) {
+for (const expected of ["permit_current", "findProgressTable", "arrayBuffer", "initSqlJs"]) {
   if (!app.includes(expected)) {
     throw new Error(`web/app.js is missing expected viewer capability: ${expected}`);
+  }
+}
+
+for (const file of ["README.md", "web/index.html", "web/app.js", "web/styles.css"]) {
+  const text = fs.readFileSync(path.join(root, file), "utf8");
+  const locationSpecificTerm = new RegExp(["van", "couver"].join(""), "i");
+  if (locationSpecificTerm.test(text)) {
+    throw new Error(`${file} contains a location-specific reference.`);
   }
 }
 

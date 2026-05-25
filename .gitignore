@@ -2,7 +2,9 @@ node_modules/
 data/
 dist/
 release/
+electron/
 coverage/
+.playwright-cli/
 .DS_Store
 Thumbs.db
 *.log

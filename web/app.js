@@ -69,7 +69,7 @@ function cacheElements() {
 }
 
 function initMap() {
-  map = L.map("map", { zoomControl: false }).setView([53.7, -124.8], 5);
+  map = L.map("map", { zoomControl: false }).setView([20, 0], 2);
   L.control.zoom({ position: "bottomright" }).addTo(map);
   L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
     maxZoom: 19,
@@ -129,10 +129,10 @@ async function loadIndexFile(event) {
   if (!file) return;
   setStatus(`Loading ${file.name}`);
   try {
-    const matrix = await readVancouverIndex(file);
+    const matrix = await readProgressSQLite(file);
     state.matrix = matrix;
     renderMatrix(matrix);
-    setStatus(`Loaded ${file.name}`);
+    setStatus("Loaded progress database");
   } catch (err) {
     setStatus(`Index load failed: ${err.message}`);
   }
@@ -189,26 +189,33 @@ async function readPermitSQLite(file) {
   }
 }
 
-async function readVancouverIndex(file) {
+async function readProgressSQLite(file) {
   const db = await openSQLite(file);
   try {
-    if (!sqliteTableExists(db, "vancouver_posse_index")) {
-      throw new Error("SQLite database does not contain vancouver_posse_index.");
+    const table = findProgressTable(db);
+    if (!table) {
+      throw new Error("SQLite database does not contain a supported progress table.");
     }
+    const dateExpr = table.dateColumn
+      ? `COALESCE(NULLIF(${quoteIdentifier(table.dateColumn)}, ''), 'Undated')`
+      : "'Undated'";
+    const stateExpr = table.statusColumn
+      ? `CASE
+          WHEN LOWER(COALESCE(${quoteIdentifier(table.statusColumn)}, '')) IN ('scraping', 'running', 'active') THEN 'scraping'
+          WHEN LOWER(COALESCE(${quoteIdentifier(table.statusColumn)}, '')) IN ('error', 'errors', 'failed', 'failure') THEN 'error'
+          WHEN LOWER(COALESCE(${quoteIdentifier(table.statusColumn)}, '')) IN ('scraped', 'done', 'complete', 'completed') THEN 'scraped'
+          ELSE 'not_processed'
+        END`
+      : "'scraped'";
     const rows = sqliteObjects(
       db,
       `SELECT
-        COALESCE(NULLIF(created_date, ''), 'Undated') AS created_date,
-        CASE
-          WHEN detail_status = 'scraping' THEN 'scraping'
-          WHEN detail_status = 'error' THEN 'error'
-          WHEN detail_status = 'scraped' THEN 'scraped'
-          ELSE 'not_processed'
-        END AS detail_state,
+        ${dateExpr} AS progress_date,
+        ${stateExpr} AS detail_state,
         COUNT(*) AS record_count
-      FROM vancouver_posse_index
-      GROUP BY created_date, detail_state
-      ORDER BY created_date, detail_state`
+      FROM ${quoteIdentifier(table.name)}
+      GROUP BY progress_date, detail_state
+      ORDER BY progress_date, detail_state`
     );
     const days = [];
     const byDate = new Map();
@@ -221,14 +228,14 @@ async function readVancouverIndex(file) {
       not_processed: 0,
       percent: 0,
       start_date: "",
-      end_date: todayISODate(),
+      end_date: "",
       days,
     };
     rows.forEach((row) => {
-      let day = byDate.get(row.created_date);
+      let day = byDate.get(row.progress_date);
       if (!day) {
-        day = { date: row.created_date, total: 0, not_processed: 0, scraped: 0, scraping: 0, error: 0 };
-        byDate.set(row.created_date, day);
+        day = { date: row.progress_date, total: 0, not_processed: 0, scraped: 0, scraping: 0, error: 0 };
+        byDate.set(row.progress_date, day);
         days.push(day);
       }
       const count = Number(row.record_count || 0);
@@ -245,7 +252,9 @@ async function readVancouverIndex(file) {
       matrix.errors += day.error;
       matrix.not_processed += day.not_processed;
     });
-    matrix.start_date = days.find((day) => day.date !== "Undated")?.date || "";
+    const datedDays = days.filter((day) => day.date !== "Undated");
+    matrix.start_date = datedDays[0]?.date || "";
+    matrix.end_date = datedDays[datedDays.length - 1]?.date || "";
     if (matrix.index_total > 0) {
       matrix.percent = Math.min(100, (matrix.scraped / matrix.index_total) * 100);
     }
@@ -273,6 +282,60 @@ function sqliteTableExists(db, tableName) {
   return rows.length > 0;
 }
 
+function findProgressTable(db) {
+  const tables = sqliteObjects(
+    db,
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+  );
+  const candidates = tables
+    .map((table) => {
+      const columns = sqliteTableColumns(db, table.name);
+      const dateColumn = firstColumn(columns, [
+        "created_date",
+        "applied_date",
+        "application_date",
+        "date",
+        "issued_date",
+        "completed_date",
+        "last_seen_at",
+        "scraped_at",
+      ]);
+      const progressStatusColumn = firstColumn(columns, ["detail_status", "progress_status", "scrape_status", "processing_status"]);
+      const recordStatusColumn = firstColumn(columns, ["scraped_at", "last_seen_at"]);
+      return {
+        name: table.name,
+        columns,
+        dateColumn,
+        statusColumn: progressStatusColumn,
+        canReadAsCompleteRecords: Boolean(dateColumn && recordStatusColumn),
+      };
+    })
+    .filter((table) => table.dateColumn && (table.statusColumn || table.canReadAsCompleteRecords));
+
+  return (
+    candidates.find((table) => table.statusColumn) ||
+    candidates.find((table) => table.name === "permit_current") ||
+    candidates[0] ||
+    null
+  );
+}
+
+function sqliteTableColumns(db, tableName) {
+  return sqliteObjects(db, `PRAGMA table_info(${quoteIdentifier(tableName)})`).map((row) => row.name);
+}
+
+function firstColumn(columns, names) {
+  const lower = new Map(columns.map((column) => [String(column).toLowerCase(), column]));
+  for (const name of names) {
+    if (lower.has(name)) return lower.get(name);
+  }
+  return "";
+}
+
+function quoteIdentifier(value) {
+  return `"${String(value).replaceAll('"', '""')}"`;
+}
+
 function sqliteObjects(db, sql, params = []) {
   const result = db.exec(sql, params);
   if (result.length === 0) return [];
@@ -283,7 +346,7 @@ function enrichRecord(record, index) {
   const coords = coordinateFor(record);
   const key = record.dedupe_key || `${record.source_id || "source"}-${record.permit_number || record.application_id || index}`;
   const dateValue = first(record.issued_date, record.applied_date, record.completed_date, record.final_date);
-  const displayId = first(record.permit_number, record.application_id, record.dedupe_key, "Unknown permit");
+  const displayId = first(record.permit_number, record.application_id, record.dedupe_key, "Unknown record");
   const status = first(record.status, "Unspecified");
   const type = first(record.permit_type, record.permit_family, "Unspecified");
   return {
@@ -324,7 +387,7 @@ function populateFilters(records) {
   fillSelect(els.jurisdictionFilter, "All jurisdictions", countValues(records, "jurisdiction"));
   fillSelect(els.sourceFilter, "All sources", countValues(records, "source_name"));
   fillSelect(els.statusFilter, "All statuses", countValues(records, "status"));
-  fillSelect(els.typeFilter, "All permit types", countValues(records, "permit_type"));
+  fillSelect(els.typeFilter, "All record types", countValues(records, "permit_type"));
 }
 
 function fillSelect(select, label, counts) {
@@ -396,7 +459,7 @@ function renderSummary() {
   els.metricFile.textContent = state.permitFileName || "None";
   els.dataSubtitle.textContent = state.permitFileName
     ? `${state.permitFileName} - ${number(state.records.length - mapped)} unmapped records`
-    : "Upload a prepopulated permit database to begin";
+    : "Upload a prepopulated records database to begin";
 }
 
 function renderEmpty() {
@@ -512,8 +575,8 @@ function renderMatrix(matrix) {
   els.matrixPercent.textContent = `${pct.toFixed(total > 0 && pct < 10 ? 1 : 0)}%`;
   els.matrixCounts.textContent = `${number(matrix?.scraped || 0)} / ${number(total)}`;
   els.matrixRange.textContent = matrix && total > 0
-    ? `${matrix.start_date || "Undated"} to ${matrix.end_date || todayISODate()} - ${matrix.fileName}`
-    : "Upload an index database to view detail progress";
+    ? `${matrix.start_date || "Undated"} to ${matrix.end_date || "Undated"}`
+    : "Upload a progress database to view detail progress";
 
   const dot = 2;
   const gap = 1;
@@ -637,7 +700,7 @@ function appendDef(dl, label, value) {
 function fitVisibleRecords() {
   const mappedRecords = state.filtered.filter((record) => record._mapped);
   if (mappedRecords.length === 0) {
-    map.setView([53.7, -124.8], 5);
+    map.setView([20, 0], 2);
     return;
   }
   const bounds = L.latLngBounds(mappedRecords.map((record) => [record._lat, record._lon]));
@@ -680,7 +743,7 @@ function exportFilteredCSV() {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "filtered-permits.csv";
+  link.download = "filtered-records.csv";
   link.click();
   URL.revokeObjectURL(url);
 }

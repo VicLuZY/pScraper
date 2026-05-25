@@ -3,7 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Permit Viewer</title>
+    <title>pScraper Viewer</title>
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="stylesheet" href="styles.css">
   </head>
@@ -13,8 +14,8 @@
         <div class="brand-block">
           <div class="brand-mark">PV</div>
           <div>
-            <h1>Permit Viewer</h1>
-            <div class="subtitle" id="dataSubtitle">Upload a prepopulated permit database to begin</div>
+            <h1>pScraper Viewer</h1>
+            <div class="subtitle" id="dataSubtitle">Upload a prepopulated records database to begin</div>
           </div>
         </div>
         <div class="toolbar">
@@ -27,11 +28,11 @@
       <section class="upload-band" aria-label="Upload database">
         <div class="upload-main">
           <label class="upload-target">
-            <span>Permit database</span>
+            <span>Records database</span>
             <input id="permitFileInput" type="file" accept=".sqlite,.sqlite3,.db,.jsonl,.json,application/json">
           </label>
           <label class="upload-target">
-            <span>Vancouver index, optional</span>
+            <span>Progress database, optional</span>
             <input id="indexFileInput" type="file" accept=".sqlite,.sqlite3,.db">
           </label>
         </div>
@@ -57,11 +58,11 @@
         </div>
       </section>
 
-      <section class="matrix-panel" id="matrixPanel" aria-label="Vancouver detail progress">
+      <section class="matrix-panel" id="matrixPanel" aria-label="Detail progress">
         <div class="matrix-heading">
           <div>
-            <h2>Vancouver Detail Matrix</h2>
-            <span id="matrixRange">Upload an index database to view detail progress</span>
+            <h2>Detail Progress Matrix</h2>
+            <span id="matrixRange">Upload a progress database to view detail progress</span>
           </div>
           <div class="matrix-summary">
             <strong id="matrixPercent">0%</strong>
@@ -70,8 +71,8 @@
         </div>
         <div class="matrix-legend" aria-label="Progress colors">
           <span><i class="matrix-key not-processed"></i>Not processed</span>
-          <span><i class="matrix-key scraped"></i>Scraped</span>
-          <span><i class="matrix-key scraping"></i>Scraping</span>
+          <span><i class="matrix-key scraped"></i>Complete</span>
+          <span><i class="matrix-key scraping"></i>In progress</span>
           <span><i class="matrix-key error"></i>Error</span>
         </div>
         <div class="matrix-canvas-wrap">
@@ -88,7 +89,7 @@
 
           <label class="field">
             <span>Search</span>
-            <input id="searchInput" type="search" placeholder="Permit, address, description">
+            <input id="searchInput" type="search" placeholder="ID, address, description">
           </label>
 
           <label class="field">
@@ -107,7 +108,7 @@
           </label>
 
           <label class="field">
-            <span>Permit Type</span>
+            <span>Record Type</span>
             <select id="typeFilter"></select>
           </label>
 
@@ -139,12 +140,12 @@
           </div>
         </aside>
 
-        <section class="map-panel" aria-label="Permit map">
+        <section class="map-panel" aria-label="Record map">
           <div id="map"></div>
           <div class="map-legend" id="mapLegend"></div>
         </section>
 
-        <aside class="records-panel" aria-label="Permit records">
+        <aside class="records-panel" aria-label="Records">
           <div class="panel-heading">
             <h2>Records</h2>
             <span id="resultCount">0</span>
