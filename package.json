@@ -2,61 +2,14 @@
   "name": "pscraper",
   "version": "0.1.0",
   "private": true,
-  "description": "Desktop GUI for BC permit scraping and permit map review.",
+  "description": "Native Ubuntu GUI for BC permit scraping progress.",
   "author": "VicLuZY <VicLuZY@users.noreply.github.com>",
-  "main": "electron/main.js",
   "scripts": {
-    "go:build": "node electron/scripts/build-backend.mjs",
-    "start": "npm run go:build && electron --no-sandbox .",
-    "electron:smoke": "npm run go:build && PSCRAPER_ELECTRON_SMOKE=1 electron --no-sandbox .",
-    "dist": "npm run go:build && electron-builder",
-    "dist:dir": "npm run go:build && electron-builder --dir",
-    "test:electron-built": "node electron/scripts/test-built-app.mjs",
-    "test": "go test ./..."
-  },
-  "build": {
-    "appId": "com.vicluzy.pscraper",
-    "productName": "pScraper",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "electron/**/*",
-      "assets/**/*",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "dist/electron-backend",
-        "to": "backend",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
-    "linux": {
-      "target": [
-        "dir"
-      ],
-      "category": "Utility",
-      "icon": "assets/app-icon.png"
-    },
-    "mac": {
-      "target": [
-        "dmg"
-      ],
-      "icon": "assets/app-icon.png"
-    },
-    "win": {
-      "target": [
-        "nsis"
-      ],
-      "icon": "assets/app-icon.ico"
-    }
-  },
-  "devDependencies": {
-    "electron": "^42.2.0",
-    "electron-builder": "^26.0.12",
-    "playwright": "^1.60.0"
+    "go:build": "scripts/build-native-app.sh",
+    "start": "scripts/launch-native-gui.sh",
+    "dist": "scripts/build-native-app.sh",
+    "dist:dir": "scripts/build-native-app.sh",
+    "native:check": "python3 native/pscraper_gtk.py --check-db --db-dir data/permits-db",
+    "test": "go test ./... && python3 -m py_compile native/pscraper_gtk.py"
   }
 }

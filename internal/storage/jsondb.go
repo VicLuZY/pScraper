@@ -2,14 +2,17 @@ package storage
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"sync"
 
+	"github.com/example/bc-permit-scraper/internal/bundle"
 	"github.com/example/bc-permit-scraper/internal/model"
 )
 
@@ -55,6 +58,17 @@ func (db *JSONDB) load() error {
 	path := db.CurrentPath()
 	f, err := os.Open(path)
 	if errors.Is(err, os.ErrNotExist) {
+		b, ok, bundleErr := bundle.ReadDefault(path)
+		if bundleErr != nil {
+			return bundleErr
+		}
+		if ok {
+			if err := db.loadCurrentLocked(bytes.NewReader(b), path); err != nil {
+				return err
+			}
+			db.loaded = true
+			return nil
+		}
 		db.loaded = true
 		return nil
 	}
@@ -62,20 +76,27 @@ func (db *JSONDB) load() error {
 		return err
 	}
 	defer f.Close()
-	sc := bufio.NewScanner(f)
+	if err := db.loadCurrentLocked(f, path); err != nil {
+		return err
+	}
+	db.loaded = true
+	return nil
+}
+
+func (db *JSONDB) loadCurrentLocked(r io.Reader, label string) error {
+	sc := bufio.NewScanner(r)
 	buf := make([]byte, 0, 1024*1024)
 	sc.Buffer(buf, 16*1024*1024)
 	for sc.Scan() {
 		var r model.PermitRecord
 		if err := json.Unmarshal(sc.Bytes(), &r); err != nil {
-			return fmt.Errorf("parse current record: %w", err)
+			return fmt.Errorf("parse current record from %s: %w", label, err)
 		}
 		db.current[r.DedupeKey] = r
 	}
 	if err := sc.Err(); err != nil {
 		return err
 	}
-	db.loaded = true
 	return nil
 }
 
@@ -86,6 +107,53 @@ func (db *JSONDB) Upsert(r model.PermitRecord) (UpsertResult, error) {
 		return "", fmt.Errorf("record missing dedupe_key or content_hash")
 	}
 	now := model.NowUTC()
+	result, evt := db.upsertLocked(r, now)
+	if evt != nil {
+		if err := appendJSON(db.HistoryPath(), *evt); err != nil {
+			return "", err
+		}
+	}
+	if err := db.flushCurrentLocked(); err != nil {
+		return "", err
+	}
+	return result, nil
+}
+
+func (db *JSONDB) UpsertMany(records []model.PermitRecord) (UpsertCounts, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	counts := UpsertCounts{}
+	events := []model.StatusEvent{}
+	now := model.NowUTC()
+	for _, r := range records {
+		if r.DedupeKey == "" || r.ContentHash == "" {
+			return counts, fmt.Errorf("record missing dedupe_key or content_hash")
+		}
+		result, evt := db.upsertLocked(r, now)
+		switch result {
+		case Inserted:
+			counts.Inserted++
+		case Updated:
+			counts.Updated++
+		case Unchanged:
+			counts.Unchanged++
+		}
+		if evt != nil {
+			events = append(events, *evt)
+		}
+	}
+	if len(events) > 0 {
+		if err := appendJSONLines(db.HistoryPath(), events); err != nil {
+			return counts, err
+		}
+	}
+	if err := db.flushCurrentLocked(); err != nil {
+		return counts, err
+	}
+	return counts, nil
+}
+
+func (db *JSONDB) upsertLocked(r model.PermitRecord, now string) (UpsertResult, *model.StatusEvent) {
 	old, exists := db.current[r.DedupeKey]
 	result := Inserted
 	if !exists {
@@ -102,30 +170,25 @@ func (db *JSONDB) Upsert(r model.PermitRecord) (UpsertResult, error) {
 	}
 	r.LastSeenAt = now
 	db.current[r.DedupeKey] = r
-	if result == Inserted || result == Updated {
-		evt := model.StatusEvent{
-			DedupeKey:      r.DedupeKey,
-			SourceID:       r.SourceID,
-			Jurisdiction:   r.Jurisdiction,
-			PermitNumber:   r.PermitNumber,
-			ApplicationID:  r.ApplicationID,
-			NewStatus:      r.Status,
-			NewContentHash: r.ContentHash,
-			ChangedAt:      now,
-			Snapshot:       r,
-		}
-		if exists {
-			evt.OldStatus = old.Status
-			evt.OldContentHash = old.ContentHash
-		}
-		if err := appendJSON(db.HistoryPath(), evt); err != nil {
-			return "", err
-		}
+	if result != Inserted && result != Updated {
+		return result, nil
 	}
-	if err := db.flushCurrentLocked(); err != nil {
-		return "", err
+	evt := model.StatusEvent{
+		DedupeKey:      r.DedupeKey,
+		SourceID:       r.SourceID,
+		Jurisdiction:   r.Jurisdiction,
+		PermitNumber:   r.PermitNumber,
+		ApplicationID:  r.ApplicationID,
+		NewStatus:      r.Status,
+		NewContentHash: r.ContentHash,
+		ChangedAt:      now,
+		Snapshot:       r,
 	}
-	return result, nil
+	if exists {
+		evt.OldStatus = old.Status
+		evt.OldContentHash = old.ContentHash
+	}
+	return result, &evt
 }
 
 func (db *JSONDB) AddAudit(a model.ScrapeAudit) error {
@@ -176,4 +239,19 @@ func appendJSON(path string, v any) error {
 	}
 	defer f.Close()
 	return json.NewEncoder(f).Encode(v)
+}
+
+func appendJSONLines[T any](path string, rows []T) error {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	enc := json.NewEncoder(f)
+	for _, row := range rows {
+		if err := enc.Encode(row); err != nil {
+			return err
+		}
+	}
+	return nil
 }

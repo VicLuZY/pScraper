@@ -1,4 +1,4 @@
-.PHONY: test run try-all map map-export package-windows sqlite-import sqlite-run fmt clean
+.PHONY: test run try-all map map-export native native-gui install-native-desktop package-windows sqlite-import sqlite-run fmt clean
 
 test:
 	go test ./...
@@ -17,6 +17,15 @@ map:
 
 map-export:
 	go run ./cmd/permit-map-export --db data/permits-db --web web --out dist/permit-map
+
+native:
+	scripts/build-native-app.sh
+
+native-gui:
+	scripts/launch-native-gui.sh
+
+install-native-desktop:
+	scripts/install-native-desktop.sh
 
 package-windows:
 	powershell -ExecutionPolicy Bypass -File scripts/package-windows.ps1

@@ -351,12 +351,12 @@
       "jurisdiction": "City of Vancouver",
       "jurisdiction_type": "Municipality",
       "region": "Metro Vancouver",
-      "kind": "public_search_needs_input",
-      "url": "https://plposweb.vancouver.ca/Public/Default.aspx?PossePresentation=PermitSearchByAddress",
+      "kind": "vancouver_posse_date_search",
+      "url": "https://plposweb.vancouver.ca/Public/Default.aspx?PossePresentation=PermitSearchByDate",
       "enabled": false,
       "download_all": false,
       "openly_searchable": true,
-      "needs_input": true,
+      "needs_input": false,
       "permit_families": [
         "Building and construction",
         "Development and planning",
@@ -384,12 +384,21 @@
         "Special event permit"
       ],
       "search_keys": [
-        "address",
-        "permit number",
         "date",
         "permit type"
       ],
-      "skip_reason": "Public search requires user-supplied address, permit number, date, or type. It is suitable for targeted monitoring, not blind download-all crawling."
+      "field_map": {
+        "permit_number": "Number",
+        "permit_type": "Type",
+        "status": "Status",
+        "address": "Location",
+        "description": "Detail WorkDescription",
+        "applied_date": "Created Date",
+        "issued_date": "Issue Date",
+        "completed_date": "Completed Date",
+        "url": "Vancouver Object URL"
+      },
+      "notes": "POSSE date search caps a result set at 1000 rows. The scraper saves discovered object IDs in vancouver_posse_index.jsonl, then follows each public detail page. --max-pages controls weekly windows unless --from/--to are supplied."
     },
     {
       "id": "surrey_odi",

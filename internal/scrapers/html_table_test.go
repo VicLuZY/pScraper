@@ -55,3 +55,10 @@ func TestHTMLTableKeepsRowsWithMappedPermitSignal(t *testing.T) {
 		t.Fatalf("bad records: %+v", recs)
 	}
 }
+
+func TestCleanCellDropsScriptBlocks(t *testing.T) {
+	got := cleanCell(`<script>Ext.onReady(function () { alert("date picker"); });</script> May 19, 2026`)
+	if got != "May 19, 2026" {
+		t.Fatalf("cleanCell() = %q", got)
+	}
+}

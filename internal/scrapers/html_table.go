@@ -14,6 +14,7 @@ type HTMLTable struct{}
 
 var rowRE = regexp.MustCompile(`(?is)<tr[^>]*>(.*?)</tr>`)
 var cellRE = regexp.MustCompile(`(?is)<t[dh][^>]*>(.*?)</t[dh]>`)
+var scriptBlockRE = regexp.MustCompile(`(?is)<script\b[^>]*>.*?</script>|<style\b[^>]*>.*?</style>`)
 var tagRE = regexp.MustCompile(`(?is)<[^>]+>`)
 
 func (HTMLTable) Scrape(ctx context.Context, client *fetcher.Client, source model.Source, opts Options) ([]model.PermitRecord, error) {
@@ -62,6 +63,7 @@ func (HTMLTable) Scrape(ctx context.Context, client *fetcher.Client, source mode
 }
 
 func cleanCell(s string) string {
+	s = scriptBlockRE.ReplaceAllString(s, " ")
 	s = tagRE.ReplaceAllString(s, " ")
 	s = html.UnescapeString(s)
 	s = strings.Join(strings.Fields(s), " ")

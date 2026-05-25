@@ -49,3 +49,14 @@ func TestJSONDBUpsertTracksInsertUnchangedUpdate(t *testing.T) {
 		t.Fatalf("expected status transition Submitted -> Issued, got %q -> %q", evt.OldStatus, evt.NewStatus)
 	}
 }
+
+func TestJSONDBSeedsDefaultCurrentFromBundle(t *testing.T) {
+	t.Chdir(t.TempDir())
+	db, err := OpenJSONDB("data/permits-db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := len(db.AllCurrent()); got == 0 {
+		t.Fatal("expected bundled current records to seed the default JSONL store")
+	}
+}

@@ -380,6 +380,7 @@ CREATE INDEX IF NOT EXISTS idx_permit_current_permit_number ON permit_current(pe
 CREATE INDEX IF NOT EXISTS idx_permit_current_address ON permit_current(address);
 CREATE INDEX IF NOT EXISTS idx_permit_current_status ON permit_current(status);
 CREATE INDEX IF NOT EXISTS idx_permit_current_source ON permit_current(source_id);
+CREATE INDEX IF NOT EXISTS idx_permit_current_source_url ON permit_current(source_id, url);
 
 CREATE TABLE IF NOT EXISTS permit_status_history (
     id INTEGER PRIMARY KEY,

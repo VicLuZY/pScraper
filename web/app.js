@@ -6,6 +6,13 @@ const state = {
   firstFit: true,
   progress: null,
   scrapeLog: [],
+  vancouverSamples: [],
+  desktopStatus: null,
+  vancouverProgressTimer: null,
+  vancouverMatrixProgress: null,
+  vancouverMatrixEta: "ETA unavailable",
+  vancouverMatrixPct: 0,
+  vancouverMatrixSignature: "",
 };
 
 const els = {};
@@ -28,6 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initMap();
   bindControls();
   initDesktopBridge();
+  startVancouverProgressPolling();
   loadData();
 });
 
@@ -62,10 +70,29 @@ function cacheElements() {
     "exportBtn",
     "desktopPanel",
     "desktopState",
+    "scrapeTarget",
     "scrapeMode",
     "scrapeLimit",
     "scrapeMaxPages",
     "scrapeParallel",
+    "vancouverFrom",
+    "vancouverTo",
+    "vancouverWorkers",
+    "vancouverDelay",
+    "vancouverProgressBox",
+    "vancouverProgressLabel",
+    "vancouverEta",
+    "vancouverProgressFill",
+    "vancouverRate",
+    "vancouverRemaining",
+    "vancouverPid",
+    "vancouverRange",
+    "vancouverMatrixPanel",
+    "vancouverMatrixRange",
+    "vancouverMatrixPercent",
+    "vancouverMatrixEta",
+    "vancouverMatrixDb",
+    "vancouverMatrixCanvas",
     "runScrapeBtn",
     "stopScrapeBtn",
     "openRuntimeBtn",
@@ -116,12 +143,17 @@ function initDesktopBridge() {
   if (!desktop || !els.desktopPanel) return;
 
   els.desktopPanel.hidden = false;
+  if (els.vancouverTo && !els.vancouverTo.value) {
+    els.vancouverTo.value = todayISODate();
+  }
+  els.scrapeTarget.addEventListener("change", updateDesktopTarget);
   els.runScrapeBtn.addEventListener("click", runDesktopScrape);
   els.stopScrapeBtn.addEventListener("click", stopDesktopScrape);
   els.openRuntimeBtn.addEventListener("click", () => desktop.openRuntimeDirectory());
 
   desktop.onScrapeLog(appendScrapeLog);
   desktop.onScrapeFinished((result) => {
+    state.desktopStatus = { running: false, activeScrape: null };
     updateScrapeControls(false);
     appendScrapeLog({
       stream: "system",
@@ -135,7 +167,10 @@ function initDesktopBridge() {
   });
 
   desktop.scrapeStatus().then((status) => {
+    state.desktopStatus = status;
     updateScrapeControls(status.running);
+    updateDesktopTarget();
+    pollVancouverProgress();
   });
 }
 
@@ -143,6 +178,7 @@ async function runDesktopScrape() {
   const desktop = window.pScraperDesktop;
   if (!desktop) return;
   state.scrapeLog = [];
+  state.vancouverSamples = [];
   appendScrapeLog({ stream: "system", text: "Preparing scrape" });
   updateScrapeControls(true);
   const result = await desktop.runScrape(readScrapeOptions());
@@ -151,7 +187,9 @@ async function runDesktopScrape() {
     appendScrapeLog({ stream: "system", text: result.message || "Scrape did not start" });
     return;
   }
+  state.desktopStatus = { running: true, activeScrape: { pid: result.pid, options: result.options, startedAt: new Date().toISOString() } };
   setStatus("Scrape running");
+  pollVancouverProgress();
 }
 
 async function stopDesktopScrape() {
@@ -162,7 +200,18 @@ async function stopDesktopScrape() {
 }
 
 function readScrapeOptions() {
+  if (els.scrapeTarget.value === "vancouver-detail") {
+    return {
+      target: "vancouver-detail",
+      from: els.vancouverFrom.value,
+      to: els.vancouverTo.value,
+      detailWorkers: els.vancouverWorkers.value,
+      delayMs: els.vancouverDelay.value,
+      timeout: 60,
+    };
+  }
   return {
+    target: "standard",
     mode: els.scrapeMode.value,
     limit: els.scrapeLimit.value,
     maxPages: els.scrapeMaxPages.value,
@@ -176,10 +225,176 @@ function updateScrapeControls(running) {
   setDesktopState(running ? "Running" : "Idle");
 }
 
+function updateDesktopTarget() {
+  if (!els.scrapeTarget) return;
+  const isVancouver = els.scrapeTarget.value === "vancouver-detail";
+  document.querySelectorAll(".standard-option").forEach((el) => {
+    el.hidden = isVancouver;
+  });
+  document.querySelectorAll(".vancouver-option").forEach((el) => {
+    el.hidden = !isVancouver;
+  });
+  if (els.vancouverProgressBox) {
+    els.vancouverProgressBox.hidden = !isVancouver;
+  }
+}
+
 function setDesktopState(text) {
   if (els.desktopState) {
     els.desktopState.textContent = text;
   }
+}
+
+async function pollDesktopProgress() {
+  return pollVancouverProgress();
+}
+
+function startVancouverProgressPolling() {
+  if (state.vancouverProgressTimer) return;
+  pollVancouverProgress();
+  state.vancouverProgressTimer = setInterval(pollVancouverProgress, 2000);
+  window.addEventListener("resize", () => {
+    state.vancouverMatrixSignature = "";
+    renderVancouverMatrix(state.vancouverMatrixProgress, state.vancouverMatrixEta, state.vancouverMatrixPct);
+  });
+}
+
+async function pollVancouverProgress() {
+  const desktop = window.pScraperDesktop;
+  try {
+    const statusPromise = desktop ? desktop.scrapeStatus().catch(() => state.desktopStatus) : Promise.resolve(state.desktopStatus);
+    const [status, progress] = await Promise.all([statusPromise, fetchJSON("/api/vancouver-progress").catch(() => null)]);
+    if (status) {
+      state.desktopStatus = status;
+      if (els.desktopPanel && !els.desktopPanel.hidden) {
+        updateScrapeControls(status.running);
+      }
+    }
+    if (progress) {
+      renderVancouverProgress(progress, status);
+    }
+  } catch (err) {
+    if (els.vancouverMatrixRange) {
+      els.vancouverMatrixRange.textContent = `Progress unavailable: ${err.message}`;
+    }
+  }
+}
+
+function renderVancouverProgress(progress, status) {
+  const total = Number(progress.index_total || 0);
+  const complete = Number(progress.scraped || progress.with_detail_url || 0);
+  const remaining = Math.max(0, Number(progress.remaining || Math.max(0, total - complete)));
+  const pct = total > 0 ? Math.min(100, (complete / total) * 100) : 0;
+  const now = Date.now();
+  state.vancouverSamples.push({ t: now, value: complete });
+  state.vancouverSamples = state.vancouverSamples.filter((sample) => now - sample.t <= 5 * 60 * 1000);
+  const ratePerMin = sampleRatePerMinute(state.vancouverSamples);
+  const eta = ratePerMin > 0 && remaining > 0 ? formatDuration((remaining / ratePerMin) * 60 * 1000) : "ETA unavailable";
+  const pid = status?.activeScrape?.pid || "-";
+
+  if (els.vancouverProgressLabel) els.vancouverProgressLabel.textContent = `${number(complete)} / ${number(total)}`;
+  if (els.vancouverEta) els.vancouverEta.textContent = eta;
+  if (els.vancouverProgressFill) els.vancouverProgressFill.style.width = `${pct.toFixed(1)}%`;
+  if (els.vancouverRate) els.vancouverRate.textContent = `${number(Math.round(ratePerMin))} records/min`;
+  if (els.vancouverRemaining) els.vancouverRemaining.textContent = `${number(remaining)} remaining`;
+  if (els.vancouverPid) els.vancouverPid.textContent = `PID ${pid}`;
+  if (els.vancouverRange) {
+    els.vancouverRange.textContent = progress.start_date ? `${progress.start_date} to ${progress.end_date || todayISODate()}` : "No index range";
+  }
+  renderVancouverMatrix(progress, eta, pct);
+}
+
+function renderVancouverMatrix(progress, eta, pct) {
+  if (!els.vancouverMatrixCanvas || !progress) return;
+  state.vancouverMatrixProgress = progress;
+  state.vancouverMatrixEta = eta;
+  state.vancouverMatrixPct = pct;
+
+  const total = Number(progress.index_total || 0);
+  const complete = Number(progress.scraped || progress.with_detail_url || 0);
+  const start = progress.start_date || progress.min_applied || "";
+  const end = progress.end_date || todayISODate();
+  if (els.vancouverMatrixPercent) {
+    els.vancouverMatrixPercent.textContent = `${pct.toFixed(total > 0 && pct < 10 ? 1 : 0)}%`;
+  }
+  if (els.vancouverMatrixEta) {
+    els.vancouverMatrixEta.textContent = eta;
+  }
+  if (els.vancouverMatrixDb) {
+    els.vancouverMatrixDb.textContent = progress.permit_db || progress.index_db || "No database file";
+  }
+  if (els.vancouverMatrixRange) {
+    els.vancouverMatrixRange.textContent = total > 0 ? `${start || "Undated"} to ${end} - ${number(complete)} of ${number(total)} scraped` : "No Vancouver index loaded";
+  }
+
+  const canvas = els.vancouverMatrixCanvas;
+  const wrap = canvas.parentElement;
+  const width = Math.max(1, Math.floor(wrap?.clientWidth || canvas.clientWidth || 1));
+  const days = Array.isArray(progress.days) ? progress.days : [];
+  const signature = [
+    width,
+    total,
+    progress.not_processed || 0,
+    complete,
+    progress.scraping || 0,
+    progress.errors || 0,
+    days.map((day) => `${day.date}:${day.not_processed || 0}:${day.scraped || 0}:${day.scraping || 0}:${day.error || 0}`).join("|"),
+  ].join(";");
+  if (signature === state.vancouverMatrixSignature) return;
+  state.vancouverMatrixSignature = signature;
+
+  const dot = 2;
+  const gap = 1;
+  const step = dot + gap;
+  const columns = Math.max(1, Math.floor((width - gap) / step));
+  const rows = Math.max(1, Math.ceil(total / columns));
+  const height = Math.max(step, rows * step + gap);
+  canvas.width = width;
+  canvas.height = height;
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, width, height);
+  let index = 0;
+  const drawDots = (count, color) => {
+    ctx.fillStyle = color;
+    for (let i = 0; i < count; i += 1) {
+      const col = index % columns;
+      const row = Math.floor(index / columns);
+      ctx.fillRect(col * step + gap, row * step + gap, dot, dot);
+      index += 1;
+    }
+  };
+  days.forEach((day) => {
+    drawDots(Number(day.not_processed || 0), "#c9d1d5");
+    drawDots(Number(day.scraped || 0), "#287a3e");
+    drawDots(Number(day.scraping || 0), "#c89116");
+    drawDots(Number(day.error || 0), "#b93636");
+  });
+  if (index < total) {
+    drawDots(total - index, "#c9d1d5");
+  }
+}
+
+function sampleRatePerMinute(samples) {
+  if (!Array.isArray(samples) || samples.length < 2) return 0;
+  const firstSample = samples[0];
+  const lastSample = samples[samples.length - 1];
+  const elapsedMin = (lastSample.t - firstSample.t) / 60000;
+  if (elapsedMin <= 0) return 0;
+  return Math.max(0, (lastSample.value - firstSample.value) / elapsedMin);
+}
+
+function formatDuration(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return "ETA unavailable";
+  const totalMinutes = Math.ceil(ms / 60000);
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) return `${days}d ${hours}h remaining`;
+  if (hours > 0) return `${hours}h ${minutes}m remaining`;
+  return `${minutes}m remaining`;
 }
 
 function appendScrapeLog(payload) {
@@ -808,6 +1023,10 @@ function first(...values) {
 
 function number(value) {
   return Number(value || 0).toLocaleString();
+}
+
+function todayISODate() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function labelCase(value) {

@@ -129,7 +129,7 @@ func normalizeDate(s string) string {
 			return time.UnixMilli(ms).UTC().Format("2006-01-02")
 		}
 	}
-	for _, layout := range []string{"02/01/2006", "02/01/06", "Jan-02-2006", "January 2, 2006"} {
+	for _, layout := range []string{"02/01/2006", "02/01/06", "Jan-02-2006", "Jan 2, 2006", "Jan 02, 2006", "Jan, 2, 2006", "Jan, 02, 2006", "January 2, 2006"} {
 		if t, err := time.Parse(layout, s); err == nil {
 			return t.Format("2006-01-02")
 		}

@@ -52,6 +52,29 @@
         </div>
       </section>
 
+      <section class="vancouver-matrix-panel" id="vancouverMatrixPanel" aria-label="Vancouver POSSE detail progress">
+        <div class="matrix-heading">
+          <div>
+            <h2>Vancouver POSSE Detail Matrix</h2>
+            <span id="vancouverMatrixRange">No Vancouver index loaded</span>
+          </div>
+          <div class="matrix-summary">
+            <strong id="vancouverMatrixPercent">0%</strong>
+            <span id="vancouverMatrixEta">ETA unavailable</span>
+            <span id="vancouverMatrixDb">No database file</span>
+          </div>
+        </div>
+        <div class="matrix-legend" aria-label="Progress colors">
+          <span><i class="matrix-key not-processed"></i>Not processed</span>
+          <span><i class="matrix-key scraped"></i>Scraped</span>
+          <span><i class="matrix-key scraping"></i>Scraping</span>
+          <span><i class="matrix-key error"></i>Error</span>
+        </div>
+        <div class="matrix-canvas-wrap">
+          <canvas id="vancouverMatrixCanvas" width="1" height="1"></canvas>
+        </div>
+      </section>
+
       <main class="workspace">
         <aside class="filter-panel" aria-label="Filters">
           <div class="panel-heading">
@@ -64,26 +87,66 @@
               <h2>Scraper</h2>
               <span id="desktopState">Idle</span>
             </div>
+            <label class="field compact desktop-target">
+              <span>Target</span>
+              <select id="scrapeTarget">
+                <option value="vancouver-detail">Vancouver POSSE details</option>
+                <option value="standard">Configured sources</option>
+              </select>
+            </label>
             <div class="desktop-grid">
-              <label class="field compact">
+              <label class="field compact standard-option">
                 <span>Mode</span>
                 <select id="scrapeMode">
                   <option value="all">Enabled sources</option>
                   <option value="try-all">Audit all sources</option>
                 </select>
               </label>
-              <label class="field compact">
+              <label class="field compact standard-option">
                 <span>Limit</span>
                 <input id="scrapeLimit" type="number" min="1" value="25">
               </label>
-              <label class="field compact">
+              <label class="field compact standard-option">
                 <span>Pages</span>
                 <input id="scrapeMaxPages" type="number" min="1" value="1">
               </label>
-              <label class="field compact">
+              <label class="field compact standard-option">
                 <span>Parallel</span>
                 <input id="scrapeParallel" type="number" min="1" value="4">
               </label>
+              <label class="field compact vancouver-option">
+                <span>From</span>
+                <input id="vancouverFrom" type="date" value="2000-01-01">
+              </label>
+              <label class="field compact vancouver-option">
+                <span>To</span>
+                <input id="vancouverTo" type="date">
+              </label>
+              <label class="field compact vancouver-option">
+                <span>Workers</span>
+                <input id="vancouverWorkers" type="number" min="1" value="8">
+              </label>
+              <label class="field compact vancouver-option">
+                <span>Delay ms</span>
+                <input id="vancouverDelay" type="number" min="0" value="200">
+              </label>
+            </div>
+            <div class="desktop-progress" id="vancouverProgressBox">
+              <div class="desktop-progress-top">
+                <strong id="vancouverProgressLabel">0 / 0</strong>
+                <span id="vancouverEta">ETA unavailable</span>
+              </div>
+              <div class="desktop-progress-track">
+                <span id="vancouverProgressFill"></span>
+              </div>
+              <div class="desktop-progress-meta">
+                <span id="vancouverRate">0 records/min</span>
+                <span id="vancouverRemaining">0 remaining</span>
+              </div>
+              <div class="desktop-progress-meta">
+                <span id="vancouverPid">PID -</span>
+                <span id="vancouverRange">No detail range</span>
+              </div>
             </div>
             <div class="desktop-actions">
               <button id="runScrapeBtn" class="icon-button primary" type="button" title="Run scrape">

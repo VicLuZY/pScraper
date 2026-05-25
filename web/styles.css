@@ -39,7 +39,7 @@ select {
 .app-shell {
   height: 100vh;
   display: grid;
-  grid-template-rows: 64px 64px minmax(0, 1fr) 34px;
+  grid-template-rows: 64px 64px 188px minmax(0, 1fr) 34px;
   background: var(--bg);
 }
 
@@ -179,6 +179,111 @@ h2 {
   white-space: nowrap;
 }
 
+.vancouver-matrix-panel {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 8px;
+  padding: 10px 16px 12px;
+  border-bottom: 1px solid var(--line);
+  background: #f9fbfb;
+}
+
+.matrix-heading {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.matrix-heading > div:first-child,
+.matrix-summary {
+  min-width: 0;
+}
+
+.matrix-heading h2 {
+  font-size: 14px;
+}
+
+.matrix-heading span,
+.matrix-summary span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.matrix-heading > div:first-child > span,
+.matrix-summary span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.matrix-summary {
+  display: grid;
+  grid-template-columns: auto auto minmax(140px, 260px);
+  align-items: baseline;
+  gap: 12px;
+  text-align: right;
+}
+
+.matrix-summary strong {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.matrix-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.matrix-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.matrix-key {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  background: #c9d1d5;
+}
+
+.matrix-key.scraped {
+  background: var(--ok);
+}
+
+.matrix-key.scraping {
+  background: #c89116;
+}
+
+.matrix-key.error {
+  background: var(--danger);
+}
+
+.matrix-canvas-wrap {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+#vancouverMatrixCanvas {
+  display: block;
+  min-width: 100%;
+}
+
 .workspace {
   min-height: 0;
   display: grid;
@@ -274,11 +379,17 @@ h2 {
   white-space: nowrap;
 }
 
+.desktop-target {
+  padding: 10px;
+  background: #fff;
+}
+
 .desktop-grid {
   display: grid;
   grid-template-columns: 1fr 78px;
   gap: 8px;
   padding: 10px;
+  border-top: 1px solid var(--line);
   background: #fff;
 }
 
@@ -290,6 +401,60 @@ h2 {
 .field.compact select {
   height: 32px;
   min-width: 0;
+}
+
+.standard-option[hidden],
+.vancouver-option[hidden],
+.desktop-progress[hidden] {
+  display: none;
+}
+
+.desktop-progress {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid var(--line);
+  background: #fff;
+}
+
+.desktop-progress-top,
+.desktop-progress-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.desktop-progress-top strong {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.desktop-progress-top span,
+.desktop-progress-meta span {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-progress-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e3e9ec;
+}
+
+.desktop-progress-track span {
+  display: block;
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 260ms ease;
 }
 
 .desktop-actions {
@@ -713,7 +878,7 @@ h2 {
   .app-shell {
     height: auto;
     min-height: 100vh;
-    grid-template-rows: auto auto auto auto;
+    grid-template-rows: auto auto auto auto auto;
   }
 
   .topbar,
@@ -723,6 +888,26 @@ h2 {
 
   .banner {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .vancouver-matrix-panel {
+    min-height: 210px;
+  }
+
+  .matrix-heading,
+  .matrix-legend {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .matrix-summary {
+    width: 100%;
+    grid-template-columns: auto minmax(90px, 1fr);
+    text-align: left;
+  }
+
+  .matrix-summary span:last-child {
+    grid-column: 1 / -1;
   }
 
   .metric:nth-child(3),

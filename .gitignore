@@ -3,7 +3,7 @@
 *.log
 *.err.log
 
-# Node/Electron dependencies and packages.
+# Node dependencies and packages.
 node_modules/
 release/
 
@@ -17,6 +17,10 @@ dist/*
 !dist/pScraper.exe
 *.test
 coverage.out
+
+# Python artifacts.
+__pycache__/
+*.py[cod]
 
 # OS/editor noise.
 .DS_Store

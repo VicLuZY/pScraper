@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -95,9 +96,9 @@ For backward compatibility, scraper flags can be passed without the "scrape" sub
 }
 
 func runScrape(args []string, stdout io.Writer) error {
-	var cfgPath, dbPath, storeKind, sourceIDs, userAgent string
-	var all, tryAll, failFast, dryRun bool
-	var limit, maxPages, parallel int
+	var cfgPath, dbPath, storeKind, sourceIDs, userAgent, fromDate, toDate, detailStatus string
+	var all, tryAll, failFast, dryRun, indexOnly, detailOnly bool
+	var limit, maxPages, parallel, delayMS, indexWorkers, detailWorkers int
 	var timeoutSec int
 	fs := flag.NewFlagSet("permit-scraper", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -112,6 +113,14 @@ func runScrape(args []string, stdout io.Writer) error {
 	fs.IntVar(&limit, "limit", 0, "max records per source; 0 means scraper default/all")
 	fs.IntVar(&maxPages, "max-pages", 0, "max pages per paginated source; 0 means no explicit cap")
 	fs.IntVar(&parallel, "parallel", 1, "number of sources to scrape concurrently")
+	fs.IntVar(&delayMS, "delay-ms", 1500, "minimum delay between same-site HTTP request starts")
+	fs.StringVar(&fromDate, "from", "", "source-specific start date in YYYY-MM-DD")
+	fs.StringVar(&toDate, "to", "", "source-specific end date in YYYY-MM-DD")
+	fs.IntVar(&indexWorkers, "index-workers", 1, "source-specific index discovery workers")
+	fs.IntVar(&detailWorkers, "detail-workers", 1, "source-specific detail page workers")
+	fs.BoolVar(&indexOnly, "index-only", false, "source-specific index discovery only; do not return detail records")
+	fs.BoolVar(&detailOnly, "detail-only", false, "source-specific detail scraping from existing index only")
+	fs.StringVar(&detailStatus, "detail-status", "all", "Vancouver detail status filter: all, pending, error, scraping, scraped, or comma-separated values")
 	fs.IntVar(&timeoutSec, "timeout", 45, "HTTP timeout in seconds")
 	fs.StringVar(&userAgent, "user-agent", os.Getenv("USER_AGENT"), "polite user-agent string")
 	if err := fs.Parse(args); err != nil {
@@ -134,7 +143,10 @@ func runScrape(args []string, stdout io.Writer) error {
 	if closer, ok := db.(interface{ Close() error }); ok {
 		defer closer.Close()
 	}
-	client := fetcher.New(userAgent, time.Duration(timeoutSec)*time.Second, 1500*time.Millisecond)
+	if delayMS < 0 {
+		return fmt.Errorf("--delay-ms must be >= 0")
+	}
+	client := fetcher.New(userAgent, time.Duration(timeoutSec)*time.Second, time.Duration(delayMS)*time.Millisecond)
 	runID := fmt.Sprintf("run-%d", time.Now().UTC().Unix())
 	sum := summary{RunID: runID, StartedAt: model.NowUTC(), Sources: len(selected), Errors: map[string]string{}, DBPath: dbPath}
 	progressPath := progressPathFor(storeKind, dbPath)
@@ -144,9 +156,21 @@ func runScrape(args []string, stdout io.Writer) error {
 	}
 
 	runner := &scrapeRunner{
-		db:       db,
-		client:   client,
-		opts:     scrapers.Options{MaxPages: maxPages, Limit: limit, DryRun: dryRun},
+		db:     db,
+		client: client,
+		opts: scrapers.Options{
+			MaxPages:      maxPages,
+			Limit:         limit,
+			DryRun:        dryRun,
+			FromDate:      fromDate,
+			ToDate:        toDate,
+			DataDir:       dataDirFor(storeKind, dbPath),
+			IndexWorkers:  indexWorkers,
+			DetailWorkers: detailWorkers,
+			IndexOnly:     indexOnly,
+			DetailOnly:    detailOnly,
+			DetailStatus:  detailStatus,
+		},
 		progress: progress,
 		failFast: failFast,
 		dryRun:   dryRun,
@@ -222,6 +246,36 @@ func (r *scrapeRunner) runSource(ctx context.Context, src model.Source) error {
 		r.progress.Finish(audit)
 		return err
 	}
+	if streaming, ok := scraper.(scrapers.StreamingScraper); ok {
+		sink := &runnerRecordSink{runner: r, audit: &audit, seenKeys: map[string]bool{}}
+		if err := streaming.ScrapeToSink(ctx, r.client, src, r.opts, sink); err != nil {
+			audit.FinishedAt = model.NowUTC()
+			if skip, ok := scrapers.AsSkipError(err); ok {
+				audit.Status = skip.Status
+				audit.Skipped = true
+				audit.Message = err.Error()
+				r.addSkipped()
+				r.persistAudit(audit, true)
+			} else {
+				audit.Status = "broken_or_changed"
+				audit.Message = err.Error()
+				r.addError(src.ID, err.Error())
+				r.persistAudit(audit, true)
+			}
+			r.progress.Finish(audit)
+			return err
+		}
+		if audit.Status == "" {
+			audit.Status = "ok"
+		}
+		audit.FinishedAt = model.NowUTC()
+		if !r.dryRun {
+			r.persistAudit(audit, false)
+		}
+		r.addAuditToSummary(audit)
+		r.progress.Finish(audit)
+		return nil
+	}
 	recs, err := scraper.Scrape(ctx, r.client, src, r.opts)
 	if err != nil {
 		audit.FinishedAt = model.NowUTC()
@@ -242,6 +296,7 @@ func (r *scrapeRunner) runSource(ctx context.Context, src model.Source) error {
 	}
 
 	seenKeys := map[string]bool{}
+	batch := []model.PermitRecord{}
 	for _, rec := range recs {
 		rec = dedupe.Enrich(rec)
 		audit.RecordsSeen++
@@ -254,8 +309,11 @@ func (r *scrapeRunner) runSource(ctx context.Context, src model.Source) error {
 		if r.dryRun {
 			continue
 		}
+		batch = append(batch, rec)
+	}
+	if !r.dryRun && len(batch) > 0 {
 		r.dbMu.Lock()
-		result, err := r.db.Upsert(rec)
+		counts, err := upsertBatch(r.db, batch)
 		r.dbMu.Unlock()
 		if err != nil {
 			audit.Status = "broken_or_changed"
@@ -266,16 +324,20 @@ func (r *scrapeRunner) runSource(ctx context.Context, src model.Source) error {
 				r.progress.Finish(audit)
 				return err
 			}
-			continue
 		}
-		switch result {
-		case storage.Inserted:
-			audit.Inserted++
-		case storage.Updated:
-			audit.Updated++
-		case storage.Unchanged:
-			audit.Unchanged++
+		audit.Inserted += counts.Inserted
+		audit.Updated += counts.Updated
+		audit.Unchanged += counts.Unchanged
+	}
+	if audit.Status == "broken_or_changed" {
+		audit.FinishedAt = model.NowUTC()
+		r.persistAudit(audit, true)
+		r.addAuditToSummary(audit)
+		r.progress.Finish(audit)
+		if r.failFast {
+			return fmt.Errorf("%s: %s", src.ID, audit.Message)
 		}
+		return nil
 	}
 	if audit.Status == "" {
 		audit.Status = "ok"
@@ -287,6 +349,28 @@ func (r *scrapeRunner) runSource(ctx context.Context, src model.Source) error {
 	r.addAuditToSummary(audit)
 	r.progress.Finish(audit)
 	return nil
+}
+
+func upsertBatch(db storage.Store, records []model.PermitRecord) (storage.UpsertCounts, error) {
+	if bulk, ok := db.(storage.BulkStore); ok {
+		return bulk.UpsertMany(records)
+	}
+	counts := storage.UpsertCounts{}
+	for _, rec := range records {
+		result, err := db.Upsert(rec)
+		if err != nil {
+			return counts, err
+		}
+		switch result {
+		case storage.Inserted:
+			counts.Inserted++
+		case storage.Updated:
+			counts.Updated++
+		case storage.Unchanged:
+			counts.Unchanged++
+		}
+	}
+	return counts, nil
 }
 
 func (r *scrapeRunner) persistAudit(audit model.ScrapeAudit, force bool) {
@@ -319,6 +403,50 @@ func (r *scrapeRunner) addError(sourceID, message string) {
 	r.sum.Errors[sourceID] = message
 }
 
+type runnerRecordSink struct {
+	runner   *scrapeRunner
+	audit    *model.ScrapeAudit
+	seenKeys map[string]bool
+	mu       sync.Mutex
+}
+
+func (s *runnerRecordSink) PutRecords(records []model.PermitRecord) (scrapers.BatchCounts, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	counts := scrapers.BatchCounts{}
+	batch := []model.PermitRecord{}
+	for _, rec := range records {
+		rec = dedupe.Enrich(rec)
+		s.audit.RecordsSeen++
+		counts.RecordsSeen++
+		if rec.DedupeKey != "" {
+			if s.seenKeys[rec.DedupeKey] {
+				continue
+			}
+			s.seenKeys[rec.DedupeKey] = true
+		}
+		if s.runner.dryRun {
+			continue
+		}
+		batch = append(batch, rec)
+	}
+	if !s.runner.dryRun && len(batch) > 0 {
+		s.runner.dbMu.Lock()
+		upsertCounts, err := upsertBatch(s.runner.db, batch)
+		s.runner.dbMu.Unlock()
+		if err != nil {
+			return counts, err
+		}
+		s.audit.Inserted += upsertCounts.Inserted
+		s.audit.Updated += upsertCounts.Updated
+		s.audit.Unchanged += upsertCounts.Unchanged
+		counts.Inserted += upsertCounts.Inserted
+		counts.Updated += upsertCounts.Updated
+		counts.Unchanged += upsertCounts.Unchanged
+	}
+	return counts, nil
+}
+
 func openStore(kind, path string) (storage.Store, error) {
 	kind = strings.ToLower(strings.TrimSpace(kind))
 	switch {
@@ -336,6 +464,17 @@ func defaultDBPath(kind, path string) string {
 		return "data/permits.sqlite"
 	}
 	return path
+}
+
+func dataDirFor(storeKind, dbPath string) string {
+	if isSQLiteStore(storeKind) {
+		dir := filepath.Dir(dbPath)
+		if dir == "." {
+			return "data"
+		}
+		return dir
+	}
+	return dbPath
 }
 
 func progressPathFor(storeKind, dbPath string) string {
