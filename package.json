@@ -1,15 +1,9 @@
 {
-  "name": "pscraper",
-  "version": "0.1.0",
+  "name": "permit-viewer",
+  "version": "1.0.0",
   "private": true,
-  "description": "Native Ubuntu GUI for BC permit scraping progress.",
-  "author": "VicLuZY <VicLuZY@users.noreply.github.com>",
+  "description": "Static GitHub Pages permit database viewer.",
   "scripts": {
-    "go:build": "scripts/build-native-app.sh",
-    "start": "scripts/launch-native-gui.sh",
-    "dist": "scripts/build-native-app.sh",
-    "dist:dir": "scripts/build-native-app.sh",
-    "native:check": "python3 native/pscraper_gtk.py --check-db --db-dir data/permits-db",
-    "test": "go test ./... && python3 -m py_compile native/pscraper_gtk.py"
+    "test": "node scripts/verify-viewer.mjs"
   }
 }

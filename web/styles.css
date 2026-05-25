@@ -39,11 +39,12 @@ select {
 .app-shell {
   height: 100vh;
   display: grid;
-  grid-template-rows: 64px 64px 188px minmax(0, 1fr) 34px;
+  grid-template-rows: 64px 74px 64px 188px minmax(0, 1fr) 34px;
   background: var(--bg);
 }
 
-.topbar {
+.topbar,
+.upload-band {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -54,7 +55,9 @@ select {
   min-width: 0;
 }
 
-.brand-block {
+.brand-block,
+.toolbar,
+.upload-main {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -90,7 +93,8 @@ h2 {
   letter-spacing: 0;
 }
 
-.subtitle {
+.subtitle,
+.upload-status {
   margin-top: 3px;
   font-size: 12px;
   color: var(--muted);
@@ -100,11 +104,25 @@ h2 {
   max-width: min(70vw, 680px);
 }
 
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 0 0 auto;
+.upload-status {
+  margin-top: 0;
+  text-align: right;
+}
+
+.upload-target {
+  display: grid;
+  gap: 4px;
+  min-width: 240px;
+}
+
+.upload-target span {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.upload-target input {
+  max-width: 360px;
 }
 
 .icon-button {
@@ -124,27 +142,6 @@ h2 {
 .icon-button:hover {
   border-color: #9eb0b8;
   background: #f4f7f7;
-}
-
-.icon-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.58;
-}
-
-.icon-button.primary {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: #ffffff;
-}
-
-.icon-button.primary:hover {
-  border-color: #0b695c;
-  background: #0b695c;
-}
-
-.icon-button svg {
-  width: 17px;
-  height: 17px;
 }
 
 .banner {
@@ -179,7 +176,7 @@ h2 {
   white-space: nowrap;
 }
 
-.vancouver-matrix-panel {
+.matrix-panel {
   min-width: 0;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
@@ -202,10 +199,6 @@ h2 {
   min-width: 0;
 }
 
-.matrix-heading h2 {
-  font-size: 14px;
-}
-
 .matrix-heading span,
 .matrix-summary span {
   color: var(--muted);
@@ -223,7 +216,7 @@ h2 {
 
 .matrix-summary {
   display: grid;
-  grid-template-columns: auto auto minmax(140px, 260px);
+  grid-template-columns: auto auto;
   align-items: baseline;
   gap: 12px;
   text-align: right;
@@ -279,7 +272,7 @@ h2 {
   background: #ffffff;
 }
 
-#vancouverMatrixCanvas {
+#matrixCanvas {
   display: block;
   min-width: 100%;
 }
@@ -351,140 +344,6 @@ h2 {
   border-color: var(--accent);
 }
 
-.desktop-panel[hidden] {
-  display: none;
-}
-
-.desktop-panel {
-  margin: 12px 14px 2px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel-2);
-  overflow: hidden;
-}
-
-.desktop-heading {
-  min-height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 9px 10px;
-  border-bottom: 1px solid var(--line);
-}
-
-.desktop-heading span {
-  font-size: 12px;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-.desktop-target {
-  padding: 10px;
-  background: #fff;
-}
-
-.desktop-grid {
-  display: grid;
-  grid-template-columns: 1fr 78px;
-  gap: 8px;
-  padding: 10px;
-  border-top: 1px solid var(--line);
-  background: #fff;
-}
-
-.field.compact {
-  padding: 0;
-}
-
-.field.compact input,
-.field.compact select {
-  height: 32px;
-  min-width: 0;
-}
-
-.standard-option[hidden],
-.vancouver-option[hidden],
-.desktop-progress[hidden] {
-  display: none;
-}
-
-.desktop-progress {
-  display: grid;
-  gap: 8px;
-  padding: 10px;
-  border-top: 1px solid var(--line);
-  background: #fff;
-}
-
-.desktop-progress-top,
-.desktop-progress-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-width: 0;
-}
-
-.desktop-progress-top strong {
-  font-size: 13px;
-  line-height: 1.2;
-}
-
-.desktop-progress-top span,
-.desktop-progress-meta span {
-  min-width: 0;
-  color: var(--muted);
-  font-size: 11px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-progress-track {
-  height: 8px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #e3e9ec;
-}
-
-.desktop-progress-track span {
-  display: block;
-  width: 0%;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--accent);
-  transition: width 260ms ease;
-}
-
-.desktop-actions {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 10px 10px;
-  background: #fff;
-}
-
-.desktop-actions .icon-button {
-  height: 32px;
-  padding: 0 9px;
-}
-
-.scrape-log {
-  display: block;
-  max-height: 126px;
-  margin: 0;
-  padding: 9px 10px;
-  overflow: auto;
-  border-top: 1px solid var(--line);
-  background: #172026;
-  color: #d9efea;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 11px;
-  line-height: 1.45;
-  white-space: pre-wrap;
-}
-
 .date-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -501,113 +360,6 @@ h2 {
 .toggle-row input {
   width: 17px;
   height: 17px;
-}
-
-.progress-section {
-  margin: 12px 14px 0;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel-2);
-  overflow: hidden;
-}
-
-.progress-heading {
-  min-height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 9px 10px;
-  border-bottom: 1px solid var(--line);
-}
-
-.progress-heading span {
-  font-size: 12px;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-.progress-list {
-  max-height: 230px;
-  overflow: auto;
-  background: #fff;
-}
-
-.progress-row {
-  display: grid;
-  gap: 6px;
-  padding: 9px 10px;
-  border-bottom: 1px solid var(--line);
-}
-
-.progress-row:last-child {
-  border-bottom: 0;
-}
-
-.progress-row-top {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
-}
-
-.progress-source {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.progress-percent {
-  flex: 0 0 auto;
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.progress-track {
-  height: 7px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #e3e9ec;
-}
-
-.progress-track span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--accent-2);
-}
-
-.progress-row.ok .progress-track span {
-  background: var(--ok);
-}
-
-.progress-row.running .progress-track span {
-  background: var(--accent-2);
-}
-
-.progress-row.skipped .progress-track span {
-  background: var(--warn);
-}
-
-.progress-row.error .progress-track span {
-  background: var(--danger);
-}
-
-.progress-row.pending .progress-track span {
-  background: #9eabb2;
-}
-
-.progress-meta {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.3;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
 }
 
 .filter-foot {
@@ -759,6 +511,8 @@ h2 {
   font-size: 13px;
   border: 1px dashed #bac7cc;
   border-radius: 8px;
+  padding: 16px;
+  text-align: center;
 }
 
 .detail-title {
@@ -831,23 +585,6 @@ h2 {
   min-width: 0;
 }
 
-.audit-strip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  overflow: hidden;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 22px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.13);
-  white-space: nowrap;
-}
-
 .leaflet-popup-content {
   margin: 10px 12px;
   min-width: 210px;
@@ -878,41 +615,42 @@ h2 {
   .app-shell {
     height: auto;
     min-height: 100vh;
-    grid-template-rows: auto auto auto auto auto;
+    grid-template-rows: auto auto auto auto auto auto;
   }
 
   .topbar,
-  .statusbar {
-    flex-wrap: wrap;
-  }
-
-  .banner {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .vancouver-matrix-panel {
-    min-height: 210px;
-  }
-
+  .upload-band,
   .matrix-heading,
   .matrix-legend {
     align-items: flex-start;
     flex-wrap: wrap;
   }
 
-  .matrix-summary {
+  .toolbar,
+  .upload-main {
+    flex-wrap: wrap;
+  }
+
+  .upload-target {
+    min-width: min(100%, 300px);
+  }
+
+  .upload-status {
     width: 100%;
-    grid-template-columns: auto minmax(90px, 1fr);
     text-align: left;
   }
 
-  .matrix-summary span:last-child {
-    grid-column: 1 / -1;
+  .banner {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .metric:nth-child(3),
   .metric.wide {
     grid-column: 1 / -1;
+  }
+
+  .matrix-panel {
+    min-height: 210px;
   }
 
   .workspace {

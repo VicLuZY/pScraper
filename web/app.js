@@ -4,15 +4,9 @@ const state = {
   markers: new Map(),
   selectedKey: "",
   firstFit: true,
-  progress: null,
-  scrapeLog: [],
-  vancouverSamples: [],
-  desktopStatus: null,
-  vancouverProgressTimer: null,
-  vancouverMatrixProgress: null,
-  vancouverMatrixEta: "ETA unavailable",
-  vancouverMatrixPct: 0,
-  vancouverMatrixSignature: "",
+  permitFileName: "",
+  matrix: null,
+  sqlPromise: null,
 };
 
 const els = {};
@@ -31,21 +25,21 @@ const statusColors = {
 
 document.addEventListener("DOMContentLoaded", () => {
   cacheElements();
-  initIcons();
   initMap();
   bindControls();
-  initDesktopBridge();
-  startVancouverProgressPolling();
-  loadData();
+  renderEmpty();
 });
 
 function cacheElements() {
   [
     "dataSubtitle",
+    "permitFileInput",
+    "indexFileInput",
+    "uploadStatus",
     "metricRecords",
     "metricMapped",
     "metricSources",
-    "metricRun",
+    "metricFile",
     "filterCount",
     "searchInput",
     "jurisdictionFilter",
@@ -57,55 +51,21 @@ function cacheElements() {
     "mappedOnly",
     "unmappedCount",
     "statusGroupCount",
-    "progressSummary",
-    "sourceProgressList",
     "recordsList",
     "resultCount",
     "detailPanel",
     "statusText",
-    "auditStrip",
     "mapLegend",
     "fitMapBtn",
     "resetBtn",
     "exportBtn",
-    "desktopPanel",
-    "desktopState",
-    "scrapeTarget",
-    "scrapeMode",
-    "scrapeLimit",
-    "scrapeMaxPages",
-    "scrapeParallel",
-    "vancouverFrom",
-    "vancouverTo",
-    "vancouverWorkers",
-    "vancouverDelay",
-    "vancouverProgressBox",
-    "vancouverProgressLabel",
-    "vancouverEta",
-    "vancouverProgressFill",
-    "vancouverRate",
-    "vancouverRemaining",
-    "vancouverPid",
-    "vancouverRange",
-    "vancouverMatrixPanel",
-    "vancouverMatrixRange",
-    "vancouverMatrixPercent",
-    "vancouverMatrixEta",
-    "vancouverMatrixDb",
-    "vancouverMatrixCanvas",
-    "runScrapeBtn",
-    "stopScrapeBtn",
-    "openRuntimeBtn",
-    "scrapeLog",
+    "matrixRange",
+    "matrixPercent",
+    "matrixCounts",
+    "matrixCanvas",
   ].forEach((id) => {
     els[id] = document.getElementById(id);
   });
-}
-
-function initIcons() {
-  if (window.lucide) {
-    window.lucide.createIcons();
-  }
 }
 
 function initMap() {
@@ -133,392 +93,231 @@ function bindControls() {
     els[id].addEventListener("change", applyFilters);
   });
 
+  els.permitFileInput.addEventListener("change", loadPermitFile);
+  els.indexFileInput.addEventListener("change", loadIndexFile);
   els.fitMapBtn.addEventListener("click", fitVisibleRecords);
   els.resetBtn.addEventListener("click", resetFilters);
   els.exportBtn.addEventListener("click", exportFilteredCSV);
+  window.addEventListener("resize", () => renderMatrix(state.matrix));
 }
 
-function initDesktopBridge() {
-  const desktop = window.pScraperDesktop;
-  if (!desktop || !els.desktopPanel) return;
-
-  els.desktopPanel.hidden = false;
-  if (els.vancouverTo && !els.vancouverTo.value) {
-    els.vancouverTo.value = todayISODate();
-  }
-  els.scrapeTarget.addEventListener("change", updateDesktopTarget);
-  els.runScrapeBtn.addEventListener("click", runDesktopScrape);
-  els.stopScrapeBtn.addEventListener("click", stopDesktopScrape);
-  els.openRuntimeBtn.addEventListener("click", () => desktop.openRuntimeDirectory());
-
-  desktop.onScrapeLog(appendScrapeLog);
-  desktop.onScrapeFinished((result) => {
-    state.desktopStatus = { running: false, activeScrape: null };
-    updateScrapeControls(false);
-    appendScrapeLog({
-      stream: "system",
-      text: result.signal ? `Stopped at ${result.finishedAt}` : `Finished with code ${result.code} at ${result.finishedAt}`,
-    });
-    setStatus(result.code === 0 ? "Scrape finished; refreshing records" : "Scrape stopped or failed; refreshing records");
-    loadData();
-  });
-  desktop.onBackendExit((result) => {
-    setDesktopState(`Backend exited: ${result.reason}`);
-  });
-
-  desktop.scrapeStatus().then((status) => {
-    state.desktopStatus = status;
-    updateScrapeControls(status.running);
-    updateDesktopTarget();
-    pollVancouverProgress();
-  });
-}
-
-async function runDesktopScrape() {
-  const desktop = window.pScraperDesktop;
-  if (!desktop) return;
-  state.scrapeLog = [];
-  state.vancouverSamples = [];
-  appendScrapeLog({ stream: "system", text: "Preparing scrape" });
-  updateScrapeControls(true);
-  const result = await desktop.runScrape(readScrapeOptions());
-  if (!result.ok) {
-    updateScrapeControls(false);
-    appendScrapeLog({ stream: "system", text: result.message || "Scrape did not start" });
-    return;
-  }
-  state.desktopStatus = { running: true, activeScrape: { pid: result.pid, options: result.options, startedAt: new Date().toISOString() } };
-  setStatus("Scrape running");
-  pollVancouverProgress();
-}
-
-async function stopDesktopScrape() {
-  const desktop = window.pScraperDesktop;
-  if (!desktop) return;
-  await desktop.stopScrape();
-  setDesktopState("Stopping");
-}
-
-function readScrapeOptions() {
-  if (els.scrapeTarget.value === "vancouver-detail") {
-    return {
-      target: "vancouver-detail",
-      from: els.vancouverFrom.value,
-      to: els.vancouverTo.value,
-      detailWorkers: els.vancouverWorkers.value,
-      delayMs: els.vancouverDelay.value,
-      timeout: 60,
-    };
-  }
-  return {
-    target: "standard",
-    mode: els.scrapeMode.value,
-    limit: els.scrapeLimit.value,
-    maxPages: els.scrapeMaxPages.value,
-    parallel: els.scrapeParallel.value,
-  };
-}
-
-function updateScrapeControls(running) {
-  els.runScrapeBtn.disabled = running;
-  els.stopScrapeBtn.disabled = !running;
-  setDesktopState(running ? "Running" : "Idle");
-}
-
-function updateDesktopTarget() {
-  if (!els.scrapeTarget) return;
-  const isVancouver = els.scrapeTarget.value === "vancouver-detail";
-  document.querySelectorAll(".standard-option").forEach((el) => {
-    el.hidden = isVancouver;
-  });
-  document.querySelectorAll(".vancouver-option").forEach((el) => {
-    el.hidden = !isVancouver;
-  });
-  if (els.vancouverProgressBox) {
-    els.vancouverProgressBox.hidden = !isVancouver;
-  }
-}
-
-function setDesktopState(text) {
-  if (els.desktopState) {
-    els.desktopState.textContent = text;
-  }
-}
-
-async function pollDesktopProgress() {
-  return pollVancouverProgress();
-}
-
-function startVancouverProgressPolling() {
-  if (state.vancouverProgressTimer) return;
-  pollVancouverProgress();
-  state.vancouverProgressTimer = setInterval(pollVancouverProgress, 2000);
-  window.addEventListener("resize", () => {
-    state.vancouverMatrixSignature = "";
-    renderVancouverMatrix(state.vancouverMatrixProgress, state.vancouverMatrixEta, state.vancouverMatrixPct);
-  });
-}
-
-async function pollVancouverProgress() {
-  const desktop = window.pScraperDesktop;
+async function loadPermitFile(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  setStatus(`Loading ${file.name}`);
   try {
-    const statusPromise = desktop ? desktop.scrapeStatus().catch(() => state.desktopStatus) : Promise.resolve(state.desktopStatus);
-    const [status, progress] = await Promise.all([statusPromise, fetchJSON("/api/vancouver-progress").catch(() => null)]);
-    if (status) {
-      state.desktopStatus = status;
-      if (els.desktopPanel && !els.desktopPanel.hidden) {
-        updateScrapeControls(status.running);
-      }
-    }
-    if (progress) {
-      renderVancouverProgress(progress, status);
-    }
-  } catch (err) {
-    if (els.vancouverMatrixRange) {
-      els.vancouverMatrixRange.textContent = `Progress unavailable: ${err.message}`;
-    }
-  }
-}
-
-function renderVancouverProgress(progress, status) {
-  const total = Number(progress.index_total || 0);
-  const complete = Number(progress.scraped || progress.with_detail_url || 0);
-  const remaining = Math.max(0, Number(progress.remaining || Math.max(0, total - complete)));
-  const pct = total > 0 ? Math.min(100, (complete / total) * 100) : 0;
-  const now = Date.now();
-  state.vancouverSamples.push({ t: now, value: complete });
-  state.vancouverSamples = state.vancouverSamples.filter((sample) => now - sample.t <= 5 * 60 * 1000);
-  const ratePerMin = sampleRatePerMinute(state.vancouverSamples);
-  const eta = ratePerMin > 0 && remaining > 0 ? formatDuration((remaining / ratePerMin) * 60 * 1000) : "ETA unavailable";
-  const pid = status?.activeScrape?.pid || "-";
-
-  if (els.vancouverProgressLabel) els.vancouverProgressLabel.textContent = `${number(complete)} / ${number(total)}`;
-  if (els.vancouverEta) els.vancouverEta.textContent = eta;
-  if (els.vancouverProgressFill) els.vancouverProgressFill.style.width = `${pct.toFixed(1)}%`;
-  if (els.vancouverRate) els.vancouverRate.textContent = `${number(Math.round(ratePerMin))} records/min`;
-  if (els.vancouverRemaining) els.vancouverRemaining.textContent = `${number(remaining)} remaining`;
-  if (els.vancouverPid) els.vancouverPid.textContent = `PID ${pid}`;
-  if (els.vancouverRange) {
-    els.vancouverRange.textContent = progress.start_date ? `${progress.start_date} to ${progress.end_date || todayISODate()}` : "No index range";
-  }
-  renderVancouverMatrix(progress, eta, pct);
-}
-
-function renderVancouverMatrix(progress, eta, pct) {
-  if (!els.vancouverMatrixCanvas || !progress) return;
-  state.vancouverMatrixProgress = progress;
-  state.vancouverMatrixEta = eta;
-  state.vancouverMatrixPct = pct;
-
-  const total = Number(progress.index_total || 0);
-  const complete = Number(progress.scraped || progress.with_detail_url || 0);
-  const start = progress.start_date || progress.min_applied || "";
-  const end = progress.end_date || todayISODate();
-  if (els.vancouverMatrixPercent) {
-    els.vancouverMatrixPercent.textContent = `${pct.toFixed(total > 0 && pct < 10 ? 1 : 0)}%`;
-  }
-  if (els.vancouverMatrixEta) {
-    els.vancouverMatrixEta.textContent = eta;
-  }
-  if (els.vancouverMatrixDb) {
-    els.vancouverMatrixDb.textContent = progress.permit_db || progress.index_db || "No database file";
-  }
-  if (els.vancouverMatrixRange) {
-    els.vancouverMatrixRange.textContent = total > 0 ? `${start || "Undated"} to ${end} - ${number(complete)} of ${number(total)} scraped` : "No Vancouver index loaded";
-  }
-
-  const canvas = els.vancouverMatrixCanvas;
-  const wrap = canvas.parentElement;
-  const width = Math.max(1, Math.floor(wrap?.clientWidth || canvas.clientWidth || 1));
-  const days = Array.isArray(progress.days) ? progress.days : [];
-  const signature = [
-    width,
-    total,
-    progress.not_processed || 0,
-    complete,
-    progress.scraping || 0,
-    progress.errors || 0,
-    days.map((day) => `${day.date}:${day.not_processed || 0}:${day.scraped || 0}:${day.scraping || 0}:${day.error || 0}`).join("|"),
-  ].join(";");
-  if (signature === state.vancouverMatrixSignature) return;
-  state.vancouverMatrixSignature = signature;
-
-  const dot = 2;
-  const gap = 1;
-  const step = dot + gap;
-  const columns = Math.max(1, Math.floor((width - gap) / step));
-  const rows = Math.max(1, Math.ceil(total / columns));
-  const height = Math.max(step, rows * step + gap);
-  canvas.width = width;
-  canvas.height = height;
-  canvas.style.width = `${width}px`;
-  canvas.style.height = `${height}px`;
-
-  const ctx = canvas.getContext("2d");
-  ctx.clearRect(0, 0, width, height);
-  let index = 0;
-  const drawDots = (count, color) => {
-    ctx.fillStyle = color;
-    for (let i = 0; i < count; i += 1) {
-      const col = index % columns;
-      const row = Math.floor(index / columns);
-      ctx.fillRect(col * step + gap, row * step + gap, dot, dot);
-      index += 1;
-    }
-  };
-  days.forEach((day) => {
-    drawDots(Number(day.not_processed || 0), "#c9d1d5");
-    drawDots(Number(day.scraped || 0), "#287a3e");
-    drawDots(Number(day.scraping || 0), "#c89116");
-    drawDots(Number(day.error || 0), "#b93636");
-  });
-  if (index < total) {
-    drawDots(total - index, "#c9d1d5");
-  }
-}
-
-function sampleRatePerMinute(samples) {
-  if (!Array.isArray(samples) || samples.length < 2) return 0;
-  const firstSample = samples[0];
-  const lastSample = samples[samples.length - 1];
-  const elapsedMin = (lastSample.t - firstSample.t) / 60000;
-  if (elapsedMin <= 0) return 0;
-  return Math.max(0, (lastSample.value - firstSample.value) / elapsedMin);
-}
-
-function formatDuration(ms) {
-  if (!Number.isFinite(ms) || ms < 0) return "ETA unavailable";
-  const totalMinutes = Math.ceil(ms / 60000);
-  const days = Math.floor(totalMinutes / 1440);
-  const hours = Math.floor((totalMinutes % 1440) / 60);
-  const minutes = totalMinutes % 60;
-  if (days > 0) return `${days}d ${hours}h remaining`;
-  if (hours > 0) return `${hours}h ${minutes}m remaining`;
-  return `${minutes}m remaining`;
-}
-
-function appendScrapeLog(payload) {
-  if (!els.scrapeLog) return;
-  const prefix = payload.stream === "stderr" ? "ERR" : payload.stream === "stdout" ? "OUT" : "SYS";
-  const lines = String(payload.text || "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => `${prefix} ${line}`);
-  if (lines.length === 0) return;
-  state.scrapeLog.push(...lines);
-  state.scrapeLog = state.scrapeLog.slice(-80);
-  els.scrapeLog.textContent = state.scrapeLog.join("\n");
-  els.scrapeLog.scrollTop = els.scrapeLog.scrollHeight;
-}
-
-async function loadData() {
-  try {
-    setStatus("Loading records");
-    const { records, summary, audit, progress, mode } = await loadDataset();
-
+    const records = await readPermitRecords(file);
     state.records = records.map(enrichRecord);
     state.filtered = state.records.slice();
-    state.progress = progress;
+    state.selectedKey = "";
+    state.firstFit = true;
+    state.permitFileName = file.name;
     populateFilters(state.records);
-    renderSummary(summary, audit);
-    renderAudit(audit);
-    renderSourceProgress(progress, audit);
+    renderSummary();
     applyFilters();
-    setStatus(`Loaded ${state.records.length.toLocaleString()} current records${mode === "static" ? " from static export" : ""}`);
+    els.detailPanel.replaceChildren(emptyState("Select a record"));
+    setStatus(`Loaded ${number(state.records.length)} records`);
+    els.uploadStatus.textContent = `${file.name} loaded. Files stay in this browser session.`;
   } catch (err) {
     setStatus(`Load failed: ${err.message}`);
-    els.detailPanel.replaceChildren(emptyState(err.message));
+    els.uploadStatus.textContent = err.message;
   }
 }
 
-async function loadDataset() {
-  if (window.PERMIT_STATIC_DATA) {
-    return {
-      records: window.PERMIT_STATIC_DATA.records || [],
-      summary: window.PERMIT_STATIC_DATA.summary || {},
-      audit: window.PERMIT_STATIC_DATA.audit || [],
-      progress: window.PERMIT_STATIC_DATA.progress || null,
-      mode: "static",
+async function loadIndexFile(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  setStatus(`Loading ${file.name}`);
+  try {
+    const matrix = await readVancouverIndex(file);
+    state.matrix = matrix;
+    renderMatrix(matrix);
+    setStatus(`Loaded ${file.name}`);
+  } catch (err) {
+    setStatus(`Index load failed: ${err.message}`);
+  }
+}
+
+async function readPermitRecords(file) {
+  const lower = file.name.toLowerCase();
+  if (lower.endsWith(".sqlite") || lower.endsWith(".sqlite3") || lower.endsWith(".db")) {
+    return readPermitSQLite(file);
+  }
+  const text = await file.text();
+  if (lower.endsWith(".jsonl")) {
+    return text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+  }
+  const parsed = JSON.parse(text);
+  if (Array.isArray(parsed)) return parsed;
+  if (Array.isArray(parsed.records)) return parsed.records;
+  throw new Error("JSON upload must be an array of records or an object with a records array.");
+}
+
+async function readPermitSQLite(file) {
+  const db = await openSQLite(file);
+  try {
+    if (!sqliteTableExists(db, "permit_current")) {
+      throw new Error("SQLite database does not contain permit_current.");
+    }
+    return sqliteObjects(
+      db,
+      `SELECT
+        dedupe_key, source_id, source_name, jurisdiction, jurisdiction_type, region,
+        permit_number, application_id, permit_type, permit_family, status, address,
+        pid, roll_number, applicant, contractor, description, applied_date, issued_date,
+        final_date, completed_date, value, latitude, longitude, url, raw_json,
+        first_seen_at, last_seen_at, last_changed_at, scraped_at
+      FROM permit_current
+      ORDER BY COALESCE(applied_date, issued_date, completed_date, final_date, ''), dedupe_key`
+    ).map((row) => {
+      if (typeof row.raw_json === "string" && row.raw_json.trim()) {
+        try {
+          row.raw = JSON.parse(row.raw_json);
+        } catch {
+          row.raw = { raw_json: row.raw_json };
+        }
+      }
+      delete row.raw_json;
+      return row;
+    });
+  } finally {
+    db.close();
+  }
+}
+
+async function readVancouverIndex(file) {
+  const db = await openSQLite(file);
+  try {
+    if (!sqliteTableExists(db, "vancouver_posse_index")) {
+      throw new Error("SQLite database does not contain vancouver_posse_index.");
+    }
+    const rows = sqliteObjects(
+      db,
+      `SELECT
+        COALESCE(NULLIF(created_date, ''), 'Undated') AS created_date,
+        CASE
+          WHEN detail_status = 'scraping' THEN 'scraping'
+          WHEN detail_status = 'error' THEN 'error'
+          WHEN detail_status = 'scraped' THEN 'scraped'
+          ELSE 'not_processed'
+        END AS detail_state,
+        COUNT(*) AS record_count
+      FROM vancouver_posse_index
+      GROUP BY created_date, detail_state
+      ORDER BY created_date, detail_state`
+    );
+    const days = [];
+    const byDate = new Map();
+    const matrix = {
+      fileName: file.name,
+      index_total: 0,
+      scraped: 0,
+      scraping: 0,
+      errors: 0,
+      not_processed: 0,
+      percent: 0,
+      start_date: "",
+      end_date: todayISODate(),
+      days,
     };
+    rows.forEach((row) => {
+      let day = byDate.get(row.created_date);
+      if (!day) {
+        day = { date: row.created_date, total: 0, not_processed: 0, scraped: 0, scraping: 0, error: 0 };
+        byDate.set(row.created_date, day);
+        days.push(day);
+      }
+      const count = Number(row.record_count || 0);
+      day.total += count;
+      if (row.detail_state === "scraped") day.scraped += count;
+      else if (row.detail_state === "scraping") day.scraping += count;
+      else if (row.detail_state === "error") day.error += count;
+      else day.not_processed += count;
+    });
+    days.forEach((day) => {
+      matrix.index_total += day.total;
+      matrix.scraped += day.scraped;
+      matrix.scraping += day.scraping;
+      matrix.errors += day.error;
+      matrix.not_processed += day.not_processed;
+    });
+    matrix.start_date = days.find((day) => day.date !== "Undated")?.date || "";
+    if (matrix.index_total > 0) {
+      matrix.percent = Math.min(100, (matrix.scraped / matrix.index_total) * 100);
+    }
+    return matrix;
+  } finally {
+    db.close();
   }
-  const [records, summary, audit, progress] = await Promise.all([
-    fetchJSON("/api/records"),
-    fetchJSON("/api/summary"),
-    fetchJSON("/api/audit?limit=1000"),
-    fetchJSON("/api/progress").catch(() => null),
-  ]);
-  return { records, summary, audit, progress, mode: "api" };
 }
 
-async function fetchJSON(url) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(await response.text());
+async function openSQLite(file) {
+  if (!window.initSqlJs) {
+    throw new Error("SQLite reader failed to load.");
   }
-  return response.json();
+  if (!state.sqlPromise) {
+    state.sqlPromise = window.initSqlJs({
+      locateFile: (name) => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${name}`,
+    });
+  }
+  const SQL = await state.sqlPromise;
+  return new SQL.Database(new Uint8Array(await file.arrayBuffer()));
+}
+
+function sqliteTableExists(db, tableName) {
+  const rows = sqliteObjects(db, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", [tableName]);
+  return rows.length > 0;
+}
+
+function sqliteObjects(db, sql, params = []) {
+  const result = db.exec(sql, params);
+  if (result.length === 0) return [];
+  return result[0].values.map((values) => Object.fromEntries(result[0].columns.map((column, index) => [column, values[index]])));
 }
 
 function enrichRecord(record, index) {
   const coords = coordinateFor(record);
   const key = record.dedupe_key || `${record.source_id || "source"}-${record.permit_number || record.application_id || index}`;
-  const dateValue = first(
-    record.issued_date,
-    record.applied_date,
-    record.completed_date,
-    record.final_date,
-    record.last_seen_at,
-    record.scraped_at
-  );
-  const displayId = first(record.permit_number, record.application_id, record.raw?.PermitNo, "No identifier");
-  const searchable = [
-    displayId,
-    record.source_name,
-    record.jurisdiction,
-    record.status,
-    record.permit_type,
-    record.permit_family,
-    record.address,
-    record.description,
-    record.applicant,
-    record.contractor,
-  ].join(" ").toLowerCase();
-
+  const dateValue = first(record.issued_date, record.applied_date, record.completed_date, record.final_date);
+  const displayId = first(record.permit_number, record.application_id, record.dedupe_key, "Unknown permit");
+  const status = first(record.status, "Unspecified");
+  const type = first(record.permit_type, record.permit_family, "Unspecified");
   return {
     ...record,
     _key: key,
-    _lat: coords ? coords.lat : null,
-    _lon: coords ? coords.lon : null,
-    _mapped: Boolean(coords),
-    _date: normalizeDate(dateValue),
-    _dateLabel: dateValue || "",
     _displayId: displayId,
-    _search: searchable,
-    _statusGroup: statusGroup(record.status),
+    _date: normalizeDate(dateValue),
+    _dateLabel: first(dateValue, "No date"),
+    _lat: coords.lat,
+    _lon: coords.lon,
+    _mapped: Number.isFinite(coords.lat) && Number.isFinite(coords.lon),
+    _statusGroup: statusGroup(status),
+    _search: [
+      displayId,
+      record.application_id,
+      status,
+      type,
+      record.address,
+      record.description,
+      record.jurisdiction,
+      record.source_name,
+      record.applicant,
+      record.contractor,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase(),
   };
 }
 
 function coordinateFor(record) {
-  const candidates = [
-    [record.latitude, record.longitude],
-    [record.raw?.["geo_point_2d.lat"], record.raw?.["geo_point_2d.lon"]],
-    [record.raw?.Y_LAT, record.raw?.X_LONG],
-    [record.raw?.latitude, record.raw?.longitude],
-    [record.raw?.["geometry.y"], record.raw?.["geometry.x"]],
-  ];
-
-  for (const [latRaw, lonRaw] of candidates) {
-    const lat = Number.parseFloat(latRaw);
-    const lon = Number.parseFloat(lonRaw);
-    if (Number.isFinite(lat) && Number.isFinite(lon) && validLatLon(lat, lon)) {
-      return { lat, lon };
-    }
-  }
-  return null;
-}
-
-function validLatLon(lat, lon) {
-  return lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+  const lat = Number.parseFloat(first(record.latitude, record.lat));
+  const lon = Number.parseFloat(first(record.longitude, record.lon, record.lng));
+  return { lat, lon };
 }
 
 function populateFilters(records) {
@@ -534,9 +333,7 @@ function fillSelect(select, label, counts) {
   select.append(option("", label));
   [...counts.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .forEach(([value, count]) => {
-      select.append(option(value, `${value} (${count})`));
-    });
+    .forEach(([value, count]) => select.append(option(value, `${value} (${count})`)));
   if ([...select.options].some((opt) => opt.value === previous)) {
     select.value = previous;
   }
@@ -571,7 +368,7 @@ function applyFilters() {
   state.filtered = state.records.filter((record) => {
     if (q && !record._search.includes(q)) return false;
     if (jurisdiction && record.jurisdiction !== jurisdiction) return false;
-    if (source && record.source_name !== source) return false;
+    if (source && first(record.source_name, "Unspecified") !== source) return false;
     if (status && first(record.status, "Unspecified") !== status) return false;
     if (type && first(record.permit_type, "Unspecified") !== type) return false;
     if (mappedOnly && !record._mapped) return false;
@@ -590,140 +387,31 @@ function applyFilters() {
   }
 }
 
-function renderSummary(summary, audit) {
-  const sourceCount = Object.keys(summary.sources || {}).length;
-  els.metricRecords.textContent = number(summary.total);
-  els.metricMapped.textContent = number(summary.mapped);
+function renderSummary() {
+  const sourceCount = new Set(state.records.map((record) => first(record.source_id, record.source_name)).filter(Boolean)).size;
+  const mapped = state.records.filter((record) => record._mapped).length;
+  els.metricRecords.textContent = number(state.records.length);
+  els.metricMapped.textContent = number(mapped);
   els.metricSources.textContent = number(sourceCount);
-  els.dataSubtitle.textContent = `${summary.db_path || "data/permits-db"} - ${number(summary.unmapped)} unmapped records`;
-
-  const latestRun = latestAuditRun(audit);
-  els.metricRun.textContent = latestRun ? `${latestRun.run_id} - ${latestRun.count} sources` : "No audit loaded";
+  els.metricFile.textContent = state.permitFileName || "None";
+  els.dataSubtitle.textContent = state.permitFileName
+    ? `${state.permitFileName} - ${number(state.records.length - mapped)} unmapped records`
+    : "Upload a prepopulated permit database to begin";
 }
 
-function renderAudit(audit) {
-  const latest = latestAuditRun(audit);
-  els.auditStrip.replaceChildren();
-  if (!latest) return;
-
-  Object.entries(latest.statuses)
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .forEach(([status, count]) => {
-      const chip = document.createElement("span");
-      chip.className = "chip";
-      chip.textContent = `${status}: ${count}`;
-      els.auditStrip.append(chip);
-    });
-}
-
-function renderSourceProgress(progress, audit) {
-  const rows = progressRows(progress, audit);
-  els.sourceProgressList.replaceChildren();
-  if (rows.length === 0) {
-    els.progressSummary.textContent = "No run";
-    els.sourceProgressList.append(emptyState("No progress data"));
-    return;
-  }
-
-  const completed = rows.filter((row) => Number(row.progress || 0) >= 100 || isFinishedStatus(row.status)).length;
-  const total = Number(progress?.total || rows.length);
-  els.progressSummary.textContent = `${number(completed)} / ${number(total)}`;
-
-  rows
-    .slice()
-    .sort(compareProgressRows)
-    .forEach((row) => {
-      const item = document.createElement("div");
-      item.className = `progress-row ${progressClass(row.status)}`;
-
-      const top = document.createElement("div");
-      top.className = "progress-row-top";
-      const name = document.createElement("span");
-      name.className = "progress-source";
-      name.textContent = first(row.source_name, row.source_id, "Unknown source");
-      const pct = document.createElement("span");
-      pct.className = "progress-percent";
-      pct.textContent = `${progressPercent(row)}%`;
-      top.append(name, pct);
-
-      const track = document.createElement("div");
-      track.className = "progress-track";
-      const fill = document.createElement("span");
-      fill.style.width = `${progressPercent(row)}%`;
-      track.append(fill);
-
-      const meta = document.createElement("div");
-      meta.className = "progress-meta";
-      meta.textContent = [
-        labelCase(first(row.status, "pending")),
-        row.records_seen ? `${number(row.records_seen)} records` : "",
-        row.message && row.status !== "ok" ? row.message.replace(/^skip\s+[^:]+:\s*/i, "") : "",
-      ]
-        .filter(Boolean)
-        .join(" | ");
-
-      item.append(top, track, meta);
-      els.sourceProgressList.append(item);
-    });
-}
-
-function progressRows(progress, audit) {
-  if (progress && Array.isArray(progress.sources) && progress.sources.length > 0) {
-    return progress.sources;
-  }
-  const latest = latestAuditRun(audit);
-  if (!latest) return [];
-  return latest.rows.map((row) => ({
-    ...row,
-    progress: 100,
-  }));
-}
-
-function compareProgressRows(a, b) {
-  const rank = (row) => {
-    if (row.status === "running") return 0;
-    if (row.status === "pending") return 1;
-    if (row.status === "broken_or_changed") return 2;
-    if (row.skipped) return 3;
-    return 4;
-  };
-  return rank(a) - rank(b) || first(a.source_name, a.source_id).localeCompare(first(b.source_name, b.source_id));
-}
-
-function progressPercent(row) {
-  const value = Number(row.progress);
-  if (Number.isFinite(value)) return Math.max(0, Math.min(100, Math.round(value)));
-  return isFinishedStatus(row.status) ? 100 : row.status === "running" ? 35 : 0;
-}
-
-function isFinishedStatus(status) {
-  return ["ok", "endpoint_needed", "requires_search_input", "login_or_authorized_only", "not_public_bulk", "broken_or_changed", "canceled"].includes(status || "");
-}
-
-function progressClass(status) {
-  if (status === "ok") return "ok";
-  if (status === "running") return "running";
-  if (status === "broken_or_changed") return "error";
-  if (status === "pending") return "pending";
-  return "skipped";
-}
-
-function latestAuditRun(audit) {
-  if (!Array.isArray(audit) || audit.length === 0) return null;
-  const runID = audit[audit.length - 1].run_id;
-  const rows = audit.filter((row) => row.run_id === runID);
-  const statuses = {};
-  rows.forEach((row) => {
-    const status = row.status || "unknown";
-    statuses[status] = (statuses[status] || 0) + 1;
-  });
-  return { run_id: runID, count: rows.length, statuses, rows };
+function renderEmpty() {
+  populateFilters([]);
+  renderSummary();
+  renderMarkers();
+  renderResults();
+  renderFilterStats();
+  renderLegend();
+  renderMatrix(null);
 }
 
 function renderMarkers() {
   markerLayer.clearLayers();
   state.markers.clear();
-
   state.filtered
     .filter((record) => record._mapped)
     .forEach((record) => {
@@ -745,12 +433,14 @@ function renderMarkers() {
 function renderResults() {
   els.recordsList.replaceChildren();
   els.resultCount.textContent = `${number(state.filtered.length)} shown`;
-
+  if (state.records.length === 0) {
+    els.recordsList.append(emptyState("Upload a database"));
+    return;
+  }
   if (state.filtered.length === 0) {
     els.recordsList.append(emptyState("No records match"));
     return;
   }
-
   const fragment = document.createDocumentFragment();
   state.filtered.slice(0, 500).forEach((record) => {
     const row = document.createElement("button");
@@ -783,7 +473,6 @@ function renderResults() {
     row.append(body);
     fragment.append(row);
   });
-
   if (state.filtered.length > 500) {
     fragment.append(emptyState(`Showing first 500 of ${number(state.filtered.length)} records`));
   }
@@ -804,21 +493,59 @@ function renderLegend() {
   const counts = new Map();
   state.filtered
     .filter((record) => record._mapped)
-    .forEach((record) => {
-      const group = record._statusGroup;
-      counts.set(group, (counts.get(group) || 0) + 1);
-    });
-
+    .forEach((record) => counts.set(record._statusGroup, (counts.get(record._statusGroup) || 0) + 1));
   if (counts.size === 0) {
     els.mapLegend.append(legendRow(statusColors.none, "No mapped records"));
     return;
   }
-
   [...counts.entries()]
     .sort((a, b) => b[1] - a[1])
-    .forEach(([group, count]) => {
-      els.mapLegend.append(legendRow(statusColors[group] || statusColors.other, `${labelCase(group)} (${count})`));
-    });
+    .forEach(([group, count]) => els.mapLegend.append(legendRow(statusColors[group] || statusColors.other, `${labelCase(group)} (${count})`)));
+}
+
+function renderMatrix(matrix) {
+  const canvas = els.matrixCanvas;
+  const wrap = canvas.parentElement;
+  const width = Math.max(1, Math.floor(wrap?.clientWidth || canvas.clientWidth || 1));
+  const total = Number(matrix?.index_total || 0);
+  const pct = total > 0 ? Math.min(100, (Number(matrix.scraped || 0) / total) * 100) : 0;
+  els.matrixPercent.textContent = `${pct.toFixed(total > 0 && pct < 10 ? 1 : 0)}%`;
+  els.matrixCounts.textContent = `${number(matrix?.scraped || 0)} / ${number(total)}`;
+  els.matrixRange.textContent = matrix && total > 0
+    ? `${matrix.start_date || "Undated"} to ${matrix.end_date || todayISODate()} - ${matrix.fileName}`
+    : "Upload an index database to view detail progress";
+
+  const dot = 2;
+  const gap = 1;
+  const step = dot + gap;
+  const columns = Math.max(1, Math.floor((width - gap) / step));
+  const rows = Math.max(1, Math.ceil(total / columns));
+  const height = Math.max(step, rows * step + gap);
+  canvas.width = width;
+  canvas.height = height;
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, width, height);
+  if (!matrix || total <= 0) return;
+
+  let index = 0;
+  const drawDots = (count, color) => {
+    ctx.fillStyle = color;
+    for (let i = 0; i < count; i += 1) {
+      const col = index % columns;
+      const row = Math.floor(index / columns);
+      ctx.fillRect(col * step + gap, row * step + gap, dot, dot);
+      index += 1;
+    }
+  };
+  matrix.days.forEach((day) => {
+    drawDots(Number(day.not_processed || 0), "#c9d1d5");
+    drawDots(Number(day.scraped || 0), "#287a3e");
+    drawDots(Number(day.scraping || 0), "#c89116");
+    drawDots(Number(day.error || 0), "#b93636");
+  });
 }
 
 function legendRow(color, label) {
@@ -839,7 +566,6 @@ function selectRecord(key, moveMap) {
   state.selectedKey = key;
   renderResults();
   renderDetail(record);
-
   const marker = state.markers.get(key);
   if (moveMap && marker) {
     map.setView(marker.getLatLng(), Math.max(map.getZoom(), 13), { animate: true });
@@ -870,10 +596,9 @@ function renderDetail(record) {
     ["Contractor", record.contractor],
     ["Value", record.value],
     ["Description", record.description],
+    ["URL", record.url],
     ["Mapped", record._mapped ? `${record._lat.toFixed(5)}, ${record._lon.toFixed(5)}` : "No valid coordinates"],
-  ].forEach(([label, value]) => {
-    appendDef(dl, label, first(value, ""));
-  });
+  ].forEach(([label, value]) => appendDef(dl, label, first(value, "")));
   els.detailPanel.append(dl);
 
   if (record.raw && Object.keys(record.raw).length > 0) {
@@ -882,7 +607,6 @@ function renderDetail(record) {
     const summary = document.createElement("summary");
     summary.textContent = "Raw source fields";
     details.append(summary);
-
     const table = document.createElement("table");
     table.className = "raw-table";
     Object.keys(record.raw)
@@ -926,7 +650,7 @@ function resetFilters() {
   });
   els.mappedOnly.checked = false;
   state.selectedKey = "";
-  els.detailPanel.replaceChildren(emptyState("Select a record"));
+  els.detailPanel.replaceChildren(emptyState(state.records.length ? "Select a record" : "Upload a database"));
   applyFilters();
   fitVisibleRecords();
 }
@@ -947,6 +671,7 @@ function exportFilteredCSV() {
     "latitude",
     "longitude",
     "description",
+    "url",
   ];
   const rows = [columns.join(",")].concat(
     state.filtered.map((record) => columns.map((column) => csvCell(record[column] || "")).join(","))

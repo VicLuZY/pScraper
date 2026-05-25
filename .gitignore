@@ -1,27 +1,14 @@
-# Local scrape output and runtime logs.
-/data/
-*.log
-*.err.log
-
-# Node dependencies and packages.
 node_modules/
+data/
+dist/
 release/
-
-# Generated build output. The distributable is the single tracked exe.
-dist/*
-!dist/
-!dist/pScraper.exe
-
-# Go/test artifacts.
-*.exe
-!dist/pScraper.exe
-*.test
-coverage.out
-
-# Python artifacts.
-__pycache__/
-*.py[cod]
-
-# OS/editor noise.
+coverage/
 .DS_Store
 Thumbs.db
+*.log
+*.sqlite
+*.sqlite3
+*.db
+*.jsonl
+*.py[cod]
+__pycache__/

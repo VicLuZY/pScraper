@@ -3,35 +3,40 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>BC Permit Map</title>
+    <title>Permit Viewer</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="styles.css">
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
         <div class="brand-block">
-          <div class="brand-mark">BC</div>
+          <div class="brand-mark">PV</div>
           <div>
-            <h1>BC Permit Map</h1>
-            <div class="subtitle" id="dataSubtitle">Loading permit database</div>
+            <h1>Permit Viewer</h1>
+            <div class="subtitle" id="dataSubtitle">Upload a prepopulated permit database to begin</div>
           </div>
         </div>
         <div class="toolbar">
-          <button id="fitMapBtn" class="icon-button" type="button" title="Fit visible mapped records">
-            <i data-lucide="scan"></i>
-            <span>Fit</span>
-          </button>
-          <button id="resetBtn" class="icon-button" type="button" title="Reset filters">
-            <i data-lucide="rotate-ccw"></i>
-            <span>Reset</span>
-          </button>
-          <button id="exportBtn" class="icon-button" type="button" title="Export filtered CSV">
-            <i data-lucide="download"></i>
-            <span>CSV</span>
-          </button>
+          <button id="fitMapBtn" class="icon-button" type="button" title="Fit visible mapped records">Fit</button>
+          <button id="resetBtn" class="icon-button" type="button" title="Reset filters">Reset</button>
+          <button id="exportBtn" class="icon-button" type="button" title="Export filtered CSV">CSV</button>
         </div>
       </header>
+
+      <section class="upload-band" aria-label="Upload database">
+        <div class="upload-main">
+          <label class="upload-target">
+            <span>Permit database</span>
+            <input id="permitFileInput" type="file" accept=".sqlite,.sqlite3,.db,.jsonl,.json,application/json">
+          </label>
+          <label class="upload-target">
+            <span>Vancouver index, optional</span>
+            <input id="indexFileInput" type="file" accept=".sqlite,.sqlite3,.db">
+          </label>
+        </div>
+        <div class="upload-status" id="uploadStatus">No file loaded. Files stay in this browser session.</div>
+      </section>
 
       <section class="banner" aria-label="Database status">
         <div class="metric">
@@ -47,21 +52,20 @@
           <strong id="metricSources">0</strong>
         </div>
         <div class="metric wide">
-          <span class="metric-label">Latest Run</span>
-          <strong id="metricRun">No audit loaded</strong>
+          <span class="metric-label">Loaded File</span>
+          <strong id="metricFile">None</strong>
         </div>
       </section>
 
-      <section class="vancouver-matrix-panel" id="vancouverMatrixPanel" aria-label="Vancouver POSSE detail progress">
+      <section class="matrix-panel" id="matrixPanel" aria-label="Vancouver detail progress">
         <div class="matrix-heading">
           <div>
-            <h2>Vancouver POSSE Detail Matrix</h2>
-            <span id="vancouverMatrixRange">No Vancouver index loaded</span>
+            <h2>Vancouver Detail Matrix</h2>
+            <span id="matrixRange">Upload an index database to view detail progress</span>
           </div>
           <div class="matrix-summary">
-            <strong id="vancouverMatrixPercent">0%</strong>
-            <span id="vancouverMatrixEta">ETA unavailable</span>
-            <span id="vancouverMatrixDb">No database file</span>
+            <strong id="matrixPercent">0%</strong>
+            <span id="matrixCounts">0 / 0</span>
           </div>
         </div>
         <div class="matrix-legend" aria-label="Progress colors">
@@ -71,7 +75,7 @@
           <span><i class="matrix-key error"></i>Error</span>
         </div>
         <div class="matrix-canvas-wrap">
-          <canvas id="vancouverMatrixCanvas" width="1" height="1"></canvas>
+          <canvas id="matrixCanvas" width="1" height="1"></canvas>
         </div>
       </section>
 
@@ -81,89 +85,6 @@
             <h2>Filters</h2>
             <span id="filterCount">0 visible</span>
           </div>
-
-          <section class="desktop-panel" id="desktopPanel" aria-label="Desktop scraper controls" hidden>
-            <div class="desktop-heading">
-              <h2>Scraper</h2>
-              <span id="desktopState">Idle</span>
-            </div>
-            <label class="field compact desktop-target">
-              <span>Target</span>
-              <select id="scrapeTarget">
-                <option value="vancouver-detail">Vancouver POSSE details</option>
-                <option value="standard">Configured sources</option>
-              </select>
-            </label>
-            <div class="desktop-grid">
-              <label class="field compact standard-option">
-                <span>Mode</span>
-                <select id="scrapeMode">
-                  <option value="all">Enabled sources</option>
-                  <option value="try-all">Audit all sources</option>
-                </select>
-              </label>
-              <label class="field compact standard-option">
-                <span>Limit</span>
-                <input id="scrapeLimit" type="number" min="1" value="25">
-              </label>
-              <label class="field compact standard-option">
-                <span>Pages</span>
-                <input id="scrapeMaxPages" type="number" min="1" value="1">
-              </label>
-              <label class="field compact standard-option">
-                <span>Parallel</span>
-                <input id="scrapeParallel" type="number" min="1" value="4">
-              </label>
-              <label class="field compact vancouver-option">
-                <span>From</span>
-                <input id="vancouverFrom" type="date" value="2000-01-01">
-              </label>
-              <label class="field compact vancouver-option">
-                <span>To</span>
-                <input id="vancouverTo" type="date">
-              </label>
-              <label class="field compact vancouver-option">
-                <span>Workers</span>
-                <input id="vancouverWorkers" type="number" min="1" value="8">
-              </label>
-              <label class="field compact vancouver-option">
-                <span>Delay ms</span>
-                <input id="vancouverDelay" type="number" min="0" value="200">
-              </label>
-            </div>
-            <div class="desktop-progress" id="vancouverProgressBox">
-              <div class="desktop-progress-top">
-                <strong id="vancouverProgressLabel">0 / 0</strong>
-                <span id="vancouverEta">ETA unavailable</span>
-              </div>
-              <div class="desktop-progress-track">
-                <span id="vancouverProgressFill"></span>
-              </div>
-              <div class="desktop-progress-meta">
-                <span id="vancouverRate">0 records/min</span>
-                <span id="vancouverRemaining">0 remaining</span>
-              </div>
-              <div class="desktop-progress-meta">
-                <span id="vancouverPid">PID -</span>
-                <span id="vancouverRange">No detail range</span>
-              </div>
-            </div>
-            <div class="desktop-actions">
-              <button id="runScrapeBtn" class="icon-button primary" type="button" title="Run scrape">
-                <i data-lucide="play"></i>
-                <span>Run</span>
-              </button>
-              <button id="stopScrapeBtn" class="icon-button" type="button" title="Stop scrape" disabled>
-                <i data-lucide="square"></i>
-                <span>Stop</span>
-              </button>
-              <button id="openRuntimeBtn" class="icon-button" type="button" title="Open data folder">
-                <i data-lucide="folder-open"></i>
-                <span>Data</span>
-              </button>
-            </div>
-            <pre id="scrapeLog" class="scrape-log" aria-label="Scrape log"></pre>
-          </section>
 
           <label class="field">
             <span>Search</span>
@@ -206,14 +127,6 @@
             <span>Mapped records only</span>
           </label>
 
-          <section class="progress-section" aria-label="Scrape progress">
-            <div class="progress-heading">
-              <h2>Source Progress</h2>
-              <span id="progressSummary">No run</span>
-            </div>
-            <div class="progress-list" id="sourceProgressList"></div>
-          </section>
-
           <div class="filter-foot">
             <div class="mini-stat">
               <span>Unmapped in view</span>
@@ -238,19 +151,18 @@
           </div>
           <div class="records-list" id="recordsList"></div>
           <div class="detail-panel" id="detailPanel">
-            <div class="empty-state">Select a record</div>
+            <div class="empty-state">Upload a database</div>
           </div>
         </aside>
       </main>
 
       <footer class="statusbar">
-        <div id="statusText">Preparing map</div>
-        <div id="auditStrip" class="audit-strip"></div>
+        <div id="statusText">Ready</div>
       </footer>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-    <script src="/app.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+    <script src="app.js" defer></script>
   </body>
 </html>
